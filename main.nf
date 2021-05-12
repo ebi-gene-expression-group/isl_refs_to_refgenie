@@ -13,6 +13,8 @@ IRAP_CONFIGS
 
 process derive_assembly {
 
+    executor 'local'
+
     input:
         tuple val(species), file(speciesConfig) from SPECIES_CONFIG
 
@@ -25,6 +27,8 @@ process derive_assembly {
 }
 
 process annotate_configline_with_species {
+    
+    executor 'local'
 
     input:
         tuple val(species), val(assemblyName), file(speciesConfig) from SPECIES_CONF_WITH_ASSEMBLY
@@ -109,6 +113,11 @@ process build_cdna {
 process build_salmon_index {
  
     conda "${baseDir}/envs/refgenie.yml"
+
+    memory { 20.GB * task.attempt }
+
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    maxRetries 10
 
     input:
         tuple val(species), val(assembly), val(fileName) from CONFIGS_FOR_SALMON.filter{ it[2] == 'cdna_file'}.map{r -> tuple(r[0], r[1], r[3])}
