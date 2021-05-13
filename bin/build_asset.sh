@@ -7,15 +7,11 @@ filePath=$4
 refgenieDir=$5
 tag=${6:-'default'}
 
-if [ "$recipe" = 'fasta' ]; then
-    successMarker="${refgenieDir}/alias/$assembly/fasta/$tag/${assembly}.chrom.sizes"
-elif [ "$recipe" = 'ensembl_gtf' ]; then
-    successMarker="${refgenieDir}/alias/$assembly/ensembl_gtf/$tag/${assembly}_ensembl_gene_body.bed"
-fi
+completedFlag="${refgenieDir}/alias/$assembly/$recipe/$tag/_refgenie_build/refgenie_completed.flag"
 
-#if [ -e "$successMarker" ]; then
-#    echo "$successMarker already present, $recipe build cancelled" 1>&2
-#else
+if [ -e "$completedFlag" ]; then
+    echo "$completedFlag already present, $recipe build cancelled" 1>&2
+else
     filePart=''
     if [ -n "$fileType" ]; then
         filePart="--files $fileType=$filePath "
@@ -24,12 +20,12 @@ fi
     echo $refgenieCommand
     eval $refgenieCommand
    
-    if [ -e "$successMarker" ]; then
+    if [ -e "$completedFlag" ]; then
         echo "Refgenie build process successful"
     else
-        echo "Refgenie build process failed, '$successMarker' not present" 1>&2
+        echo "Refgenie build process failed, '$completedFlag' not present" 1>&2
         exit 1
     fi
-#fi
+fi
 
 touch .done
