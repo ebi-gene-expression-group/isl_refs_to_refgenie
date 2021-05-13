@@ -55,7 +55,7 @@ GENOME_INFO_FOR_REFERENCE
     .filter{ it[1] == 'reference'}
     .join(CURRENT_CONFIGS_FOR_GENOME, by: [0,1])
     .map{r -> tuple(r[0], r[2], r[4], r[5])}
-    .into{
+    .set{
         CURRENT_REFERENCE_INPUTS
     }
 
@@ -304,7 +304,7 @@ process build_annotation {
 
 CDNA_NEWEST
     .concat(CDNA_CURRENT)
-    .map{r -> tuple(r[0], r[1] + '_' + r[2].text, r[2].text, r[3].text)}
+    .map{r -> tuple(r[0], r[1] + '_cdna_' + r[2].text, r[2].text, r[3].text)}
     .into{
         CDNA_FOR_BUILD
         CDNA_FOR_SPIKES
@@ -367,7 +367,8 @@ process build_salmon_index {
         tuple val(species), file(".done") into SALMON_DONE
 
     """
-    build_asset.sh ${assembly} salmon_index '' '' ${params.refgenieDir} ${version}
+    salmon_version=$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print $2}')
+    build_asset.sh ${assembly} salmon_index '' '' ${params.refgenieDir} v\${salmon_version}
     """
 }
 
@@ -387,7 +388,8 @@ process build_kallisto_index {
         tuple val(species), file(".done") into KALLISTO_DONE
 
     """
-    build_asset.sh ${assembly} kallisto_index '' '' ${params.refgenieDir} ${version}
+    kallisto_version=$(cat ${baseDir}/envs/refgenie.yml | grep kallisto | awk -F'=' '{print $2}')
+    build_asset.sh ${assembly} kallisto_index '' '' ${params.refgenieDir} v\${kallisto_version}
     """
 }
 
