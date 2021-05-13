@@ -367,7 +367,7 @@ process build_salmon_index {
         tuple val(species), file(".done") into SALMON_DONE
 
     """
-    salmon_version=$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print $2}')
+    salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print $2}')
     build_asset.sh ${assembly} salmon_index '' '' ${params.refgenieDir} v\${salmon_version}
     """
 }
@@ -388,7 +388,7 @@ process build_kallisto_index {
         tuple val(species), file(".done") into KALLISTO_DONE
 
     """
-    kallisto_version=$(cat ${baseDir}/envs/refgenie.yml | grep kallisto | awk -F'=' '{print $2}')
+    kallisto_version=\$(cat ${baseDir}/envs/refgenie.yml | grep kallisto | awk -F'=' '{print $2}')
     build_asset.sh ${assembly} kallisto_index '' '' ${params.refgenieDir} v\${kallisto_version}
     """
 }
