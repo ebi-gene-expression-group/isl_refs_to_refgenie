@@ -367,10 +367,14 @@ process add_genome_gtf_spikes {
     """
 }
 
-GTF_FOR_BUILD
-    .concat(GTF_WITH_SPIKES)
-    .join(GENOME_REFERENCE_FOR_GTF, by: [0,1])
-    .map{r -> tuple(r[0], r[1], r[2], r[3])}
+// The complex cross logic here is just to allow multiple GTFs per assembly
+// (which a join I used initially didn't allow).
+
+GENOME_REFERENCE_FOR_GTF
+    .map{ r -> tuple(r[0] + r[1])}
+    .cross( GTF_FOR_BUILD.concat(GTF_WITH_SPIKES).map{ r -> tuple(r[0] + r[1], r[0], r[1], r[2], r[3]) } )
+    .map{ r -> r[1] }
+    .map{ r -> tuple( r[1], r[2], r[3], r[4]) }
     .set{
         GTF_BUILD_INPUTS
     }
