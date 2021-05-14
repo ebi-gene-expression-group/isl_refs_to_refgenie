@@ -249,7 +249,7 @@ ECOLI_FUNGI_CONTAMINATION_FASTA
 REFERENCE_CURRENT
     .concat(ECOLI, FUNGI, VIRUSES)
     .concat(CONTAMINATION_GENOMES_FOR_BUILD)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1].replace('.', '_'), r[2])}
+    .map{r -> tuple(r[0], r[0] + '-' + r[1].replace('.', '_'), r[2])}
     .into{
         REFERENCE_CURRENT_FOR_BUILD
         REFERENCE_CURRENT_FOR_SPIKES
@@ -347,7 +347,7 @@ process build_bowtie2_index {
 
 GTF_NEWEST
     .concat(GTF_CURRENT)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1], r[2].text, r[3].text)}
+    .map{r -> tuple(r[0], r[0] + '-' + r[1], r[2].text, r[3].text)}
     .into{
         GTF_FOR_BUILD
         GTF_FOR_SPIKES
@@ -393,7 +393,7 @@ process build_annotation {
 
 CDNA_NEWEST
     .concat(CDNA_CURRENT)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1] + '_cdna_' + r[2].text, r[2].text, r[3].text)}
+    .map{r -> tuple(r[0], r[0] + '-' + r[1] + '_cdna_' + r[2].text, r[2].text, r[3].text)}
     .into{
         CDNA_FOR_BUILD
         CDNA_FOR_SPIKES
