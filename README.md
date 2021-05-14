@@ -28,15 +28,20 @@ Input files are discovered for each species:
  3. Current GTF annotation file from species configs
  4. Newest cDNA FASTA matching pattern in genome_references.conf
  5. Newest GTF matching pattern in genome references.com
+ 6. Bacterial, fungal and viral sequence files, to be used in contamination checks. 
 
 ### Building Refgenie assets
 
 From the previous section:
 
  - 1. is indexed as a top-level reference item, and 3. and 5 added as assets thereof
- - 2. and 4. added as top-level reference items
+ - 2., 4. and 6. added as top-level reference items
 
 Further each genome and transcriptome reference is added again with each of the available spike sets (currently just ERCC).
+
+### Genome indices
+
+All genome resources are indexed by hisat2. Contamination indices are also indexed by Bowtie2.
 
 #### Transcriptome indices
 
