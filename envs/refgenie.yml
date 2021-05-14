@@ -5,3 +5,4 @@ dependencies:
   - salmon=1.2.0
   - kallisto=0.45.0
   - hisat2=2.1.0
+  - bowtie2=2.3.2
