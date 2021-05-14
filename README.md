@@ -46,3 +46,38 @@ All genome resources are indexed by hisat2. Contamination indices are also index
 #### Transcriptome indices
 
 Each of the 4 transcriptome assets for each species (current and newest, with/without spikes) is indexed by both Kallisto and Salmon, with versions picked to match our single-cell pipelines.
+
+## Result
+
+Top-level resources are named like `species-assembly[-spikename]', with the spike name being optional. For release-specific resources (principally cDNAs), the assembly component is appended with the release. The resulting content of refgenie is like:
+
+```
+> refgenie list 
+                                                             Local refgenie assets                                                              
+                                              Server subscriptions: http://refgenomes.databio.org                                               
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ genome                                                                                                 ┃ assets                              ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ escherichia_coli-fungi--str_k_12_substr_mg1655_ASM584v2-refseq_fungi_53--ercc                          │ fasta, hisat2_index                 │
+│ escherichia_coli-fungi--str_k_12_substr_mg1655_ASM584v2-refseq_fungi_53                                │ fasta, hisat2_index, bowtie2_index  │
+│ escherichia_coli-fungi-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_fungi_53-refseq_viral_2_1--ercc │ fasta, hisat2_index                 │
+│ escherichia_coli-fungi-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_fungi_53-refseq_viral_2_1       │ fasta, hisat2_index, bowtie2_index  │
+│ escherichia_coli--str_k_12_substr_mg1655_ASM584v2--ercc                                                │ fasta, hisat2_index                 │
+│ escherichia_coli--str_k_12_substr_mg1655_ASM584v2                                                      │ fasta, hisat2_index                 │
+│ escherichia_coli-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_viral_2_1--ercc                       │ fasta, hisat2_index                 │
+│ escherichia_coli-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_viral_2_1                             │ fasta, hisat2_index, bowtie2_index  │
+│ fungi--refseq_fungi_53--ercc                                                                           │ fasta, hisat2_index                 │
+│ fungi--refseq_fungi_53                                                                                 │ fasta, hisat2_index                 │
+│ fungi-viruses--refseq_fungi_53-refseq_viral_2_1--ercc                                                  │ fasta, hisat2_index, bowtie2_index  │
+│ fungi-viruses--refseq_fungi_53-refseq_viral_2_1                                                        │ fasta, hisat2_index                 │
+│ homo_sapiens--GRCh38_cdna_e95--ercc                                                                    │ fasta, salmon_index, kallisto_index │
+│ homo_sapiens--GRCh38_cdna_e95                                                                          │ fasta, salmon_index, kallisto_index │
+│ homo_sapiens--GRCh38_cdna_e99--ercc                                                                    │ fasta, salmon_index, kallisto_index │
+│ homo_sapiens--GRCh38_cdna_e99                                                                          │ fasta, salmon_index, kallisto_index │
+│ homo_sapiens--GRCh38--ercc                                                                             │ fasta, ensembl_gtf, hisat2_index    │
+│ homo_sapiens--GRCh38                                                                                   │ fasta, ensembl_gtf, hisat2_index    │                                   
+│ viruses--refseq_viral_2_1--ercc                                                                        │ fasta, hisat2_index                 │
+│ viruses--refseq_viral_2_1                                                                              │ fasta, hisat2_index                 │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────┘
+                                              use refgenie list -g <genome> for more detailed view  
+```
