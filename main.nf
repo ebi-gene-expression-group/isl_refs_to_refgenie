@@ -247,6 +247,7 @@ ECOLI_FUNGI_CONTAMINATION_FASTA
     }
 
 REFERENCE_CURRENT
+    .map{ r -> tuple( r[0], r[1], file(r[2].text) ) }
     .concat(ECOLI, FUNGI, VIRUSES)
     .concat(CONTAMINATION_GENOMES_FOR_BUILD)
     .map{r -> tuple(r[0], r[0] + '-' + r[1].replace('.', '_'), r[2])}
@@ -347,7 +348,7 @@ process build_bowtie2_index {
 
 GTF_NEWEST
     .concat(GTF_CURRENT)
-    .map{r -> tuple(r[0], r[0] + '-' + r[1], r[2].text, r[3].text)}
+    .map{r -> tuple(r[0], r[0] + '-' + r[1], r[2].text, file(r[3].text))}
     .into{
         GTF_FOR_BUILD
         GTF_FOR_SPIKES
@@ -356,7 +357,7 @@ GTF_NEWEST
 process add_genome_gtf_spikes {
     
     input:
-        tuple val(species), val(assembly), val(version), val(filePath), val(spikesName), file(spikesFile) from GTF_FOR_SPIKES.combine(SPIKES_GTF)
+        tuple val(species), val(assembly), val(version), file(filePath), val(spikesName), file(spikesFile) from GTF_FOR_SPIKES.combine(SPIKES_GTF)
 
     output:
         tuple val(species), val("${assembly}-${spikesName}"), val(version), file("${assembly}_${version}-${spikesName}.gtf.gz") into GTF_WITH_SPIKES   
@@ -393,7 +394,7 @@ process build_annotation {
 
 CDNA_NEWEST
     .concat(CDNA_CURRENT)
-    .map{r -> tuple(r[0], r[0] + '-' + r[1] + '_cdna_' + r[2].text, r[2].text, r[3].text)}
+    .map{r -> tuple(r[0], r[0] + '-' + r[1] + '_cdna_' + r[2].text, r[2].text, file(r[3].text))}
     .into{
         CDNA_FOR_BUILD
         CDNA_FOR_SPIKES
@@ -402,13 +403,12 @@ CDNA_NEWEST
 process add_cdna_spikes {
     
     input:
-        tuple val(species), val(assembly), val(version), val(filePath), val(spikesName), file(spikesFile) from CDNA_FOR_SPIKES.combine(SPIKES_CDNA)
+        tuple val(species), val(assembly), val(version), file(filePath), val(spikesName), file(spikesFile) from CDNA_FOR_SPIKES.combine(SPIKES_CDNA)
 
     output:
         tuple val(species), val("${assembly}-${spikesName}"), val(version), file("${assembly}-${spikesName}.fa.gz") into CDNA_WITH_SPIKES   
  
     """
-    echo "assembly is $assembly version is $version" 1>&2
     cat $filePath $spikesFile > ${assembly}-${spikesName}.fa.gz
     """
 }
@@ -424,7 +424,7 @@ process build_cdna {
     conda "${baseDir}/envs/refgenie.yml"
 
     input:
-        tuple val(species), val(assembly), val(version), val(filePath) from CDNA_BUILD_INPUTS
+        tuple val(species), val(assembly), val(version), file(filePath) from CDNA_BUILD_INPUTS
 
     output:
         tuple val(species), val("${assembly}"), val(version) into CDNA_REFERENCE
