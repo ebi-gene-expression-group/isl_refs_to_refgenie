@@ -81,3 +81,17 @@ Top-level resources are named like `species-assembly[-spikename]', with the spik
 └────────────────────────────────────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────┘
                                               use refgenie list -g <genome> for more detailed view  
 ```
+
+You should also be able to see the multiple release versions, e.g. for GTF files on genome FASTAs:
+
+```
+> refgenie list -g  homo_sapiens--GRCh38
+                                       Local refgenie assets                                        
+                        Server subscriptions: http://refgenomes.databio.org                         
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━┓
+┃ genome               ┃ asset (seek_keys)                                              ┃ tags     ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━┩
+│ homo_sapiens--GRCh38 │ fasta (fasta, fai, chrom_sizes, dir)                           │ default  │
+│ homo_sapiens--GRCh38 │ ensembl_gtf (ensembl_gtf, ensembl_tss, ensembl_gene_body, dir) │ e99, e95 │
+└──────────────────────┴────────────────────────────────────────────────────────────────┴──────────┘
+```
