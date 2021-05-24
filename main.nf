@@ -61,7 +61,6 @@ process find_newest_release {
 }
 
 GENOME_INFO_FOR_BUILDS
-  .filter{ it.contains('homo_sapiens') }
   .map{r -> tuple(r[0].toString(), [ 'reference', 'cdna_file', 'gtf_file' ], r[6].toString().replaceAll('\\.', '_'), r[2].toString(),[ r[3].toString(), r[4].toString(), r[5].toString().trim() ])}
   .join(CURRENT_VERSIONS)
   .join(NEWEST_VERSIONS)
@@ -79,7 +78,7 @@ process annotate_configline_with_species {
     executor 'local'
 
     input:
-        tuple val(species), file(speciesConfig) from IRAP_CONFIGS_FOR_ANNOTATE.filter{it[0] == 'homo_sapiens'}
+        tuple val(species), file(speciesConfig) from IRAP_CONFIGS_FOR_ANNOTATE
 
     output:
         file("${speciesConfig}.annotated") into ANNOTATED_CONFIGS
@@ -308,6 +307,11 @@ REFERENCE_CURRENT_FOR_BUILD
     }
 
 process build_genome {
+    
+    memory { 2.GB * task.attempt }
+
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    maxRetries 10
  
     conda "${baseDir}/envs/refgenie.yml"
 
