@@ -18,7 +18,7 @@ process find_config_species {
     executor 'local'
 
     input: 
-        file(confFile) from IRAP_CONFIGS.filter{ it.getName() == 'anas_platyrhynchos.conf' }
+        file(confFile) from IRAP_CONFIGS
 
     output:
         tuple stdout, file(confFile) into IRAP_CONFIGS_BY_SPECIES
