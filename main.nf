@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf" ).map{r -> tuple(r.baseName.toString().replace('.conf', ''), r)}
+IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf" )
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
@@ -11,13 +11,31 @@ ECOLI = Channel.of(['escherichia_coli', "${params.contamination.ecoli.assembly}"
 FUNGI = Channel.of(['fungi', "${params.contamination.fungi.assembly}", file("${params.contamination.fungi.uri}")]).first()
 VIRUSES = Channel.of(['viruses', "${params.contamination.viruses.assembly}", file("${params.contamination.viruses.uri}")]).first()
 
+// Get the species from the file- the name is not completely reliable
+
+process find_config_species {
+
+    executor 'local'
+
+    input: 
+        file(confFile) from IRAP_CONFIGS.filter{ it.getName() == 'anas_platyrhynchos.conf' }
+
+    output:
+        tuple stdout, file(confFile) into IRAP_CONFIGS_BY_SPECIES
+
+    """
+    grep "species=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'
+    """
+}
 
 // Extract general info on references from the top-level ISL genome config
 
-IRAP_CONFIGS.into{
-    IRAP_CONFIGS_FOR_RELEASE
-    IRAP_CONFIGS_FOR_ANNOTATE
-}
+IRAP_CONFIGS_BY_SPECIES
+    .unique()
+    .into{
+        IRAP_CONFIGS_FOR_RELEASE
+        IRAP_CONFIGS_FOR_ANNOTATE
+    }
 
 // Find out what version (Ensembl release etc) we have)
 
