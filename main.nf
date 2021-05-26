@@ -485,6 +485,8 @@ CDNA_FOR_BUILD
 
 process build_cdna {
  
+    maxForks 1
+    
     conda "${baseDir}/envs/refgenie.yml"
 
     input:
