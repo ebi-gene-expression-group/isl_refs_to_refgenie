@@ -326,7 +326,7 @@ REFERENCE_CURRENT_FOR_BUILD
 
 process build_genome {
     
-    maxForks 3
+    maxForks 1
 
     memory { 2.GB * task.attempt }
 
@@ -356,7 +356,7 @@ GENOME_REFERENCE
 
 process build_hisat_index {
  
-    maxForks 3
+    maxForks 1
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -381,7 +381,7 @@ process build_hisat_index {
 
 process build_bowtie2_index {
  
-    maxForks 3
+    maxForks 1
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -439,7 +439,7 @@ GENOME_REFERENCE_FOR_GTF
 
 process build_annotation {
     
-    maxForks 3
+    maxForks 1
     
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -485,7 +485,7 @@ CDNA_FOR_BUILD
 
 process build_cdna {
  
-    maxForks 3
+    maxForks 1
     
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -508,7 +508,7 @@ CDNA_REFERENCE
 
 process build_salmon_index {
  
-    maxForks 3
+    maxForks 1
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -531,7 +531,7 @@ process build_salmon_index {
 
 process build_kallisto_index {
  
-    maxForks 3
+    maxForks 1
 
     conda "${baseDir}/envs/refgenie.yml"
 
