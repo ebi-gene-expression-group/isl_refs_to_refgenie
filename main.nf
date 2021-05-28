@@ -439,6 +439,9 @@ GENOME_REFERENCE_FOR_GTF
 
 process build_annotation {
     
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    maxRetries 10
+    
     maxForks 1
     
     conda "${baseDir}/envs/refgenie.yml"
@@ -485,6 +488,9 @@ CDNA_FOR_BUILD
 
 process build_cdna {
  
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    maxRetries 10
+    
     maxForks 1
     
     conda "${baseDir}/envs/refgenie.yml"
