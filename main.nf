@@ -330,7 +330,7 @@ process build_genome {
 
     memory { 2.GB * task.attempt }
 
-    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
     maxRetries 10
  
     conda "${baseDir}/envs/refgenie.yml"
@@ -362,7 +362,7 @@ process build_hisat_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
     maxRetries 10
 
     input:
@@ -387,7 +387,7 @@ process build_bowtie2_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
     maxRetries 10
 
     input:
@@ -439,7 +439,7 @@ GENOME_REFERENCE_FOR_GTF
 
 process build_annotation {
     
-    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
     maxRetries 10
     
     maxForks 1
@@ -488,7 +488,7 @@ CDNA_FOR_BUILD
 
 process build_cdna {
  
-    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
     maxRetries 10
     
     maxForks 1
@@ -520,7 +520,7 @@ process build_salmon_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
     maxRetries 10
 
     input:
@@ -543,7 +543,7 @@ process build_kallisto_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'ignore' }
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
     maxRetries 10
 
     input:
