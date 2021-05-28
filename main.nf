@@ -158,7 +158,7 @@ process find_newest_cdna {
         tuple val(species), val(configType), val(assembly), val(source), val(pattern), val(currentRelease), val(newestRelease) from GENOME_INFO_FOR_CDNA_NEWEST
 
     output:
-        tuple val(species),  val(assembly), file('version.txt'), file('cdna_filename.txt'), val('newest') optional true into CDNA_NEWEST  
+        tuple val(species),  val(assembly), file('version.txt'), file('cdna_filename.txt'), val('cdna_newest') optional true into CDNA_NEWEST  
 
     """
     versioned_cdna_fasta=${params.irapDataDir}/reference/$species/\$(basename $pattern | sed 's/.fa.gz/.${newestRelease}.fa.gz/')
@@ -184,7 +184,7 @@ process find_current_cdna {
         tuple val(species), val(configType), val(assembly), val(source), val(pattern), val(currentRelease), val(newestRelease), val(currentFile) from CURRENT_CDNA_INPUTS
 
     output:
-        tuple val(species), val(assembly), file('version.txt'), file('cdna_filename.txt'), val('current') into CDNA_CURRENT
+        tuple val(species), val(assembly), file('version.txt'), file('cdna_filename.txt'), val('cdna_current') into CDNA_CURRENT
         
     """
     current_cdna_path=${params.irapDataDir}/reference/${species}/$currentFile
@@ -291,7 +291,7 @@ REFERENCE_CURRENT
     .map{ r -> tuple( r[0], r[1], file(r[2].text) ) }
     .concat(ECOLI, FUNGI, VIRUSES)
     .concat(CONTAMINATION_GENOMES_FOR_BUILD)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1].replace('.', '_'), r[2])}
+    .map{r -> tuple(r[0], r[0] + '--' + r[1].replace('.', '_'), r[2], 'genome,default')}
     .into{
         REFERENCE_CURRENT_FOR_BUILD
         REFERENCE_CURRENT_FOR_SPIKES
@@ -305,7 +305,7 @@ process add_genome_spikes {
         tuple val(species), val(assembly), file(filePath), val(spikesName), file(spikesFile) from REFERENCE_CURRENT_FOR_SPIKES.combine(SPIKES_GENOME)
 
     output:
-        tuple val(species), val("${assembly}--${spikesName}"), file("${assembly}--${spikesName}.fa.gz") into REFERENCE_CURRENT_WITH_SPIKES   
+        tuple val(species), val("${assembly}"), file("${assembly}--${spikesName}.fa.gz"), val("genome-spikes_${spikesName}") into REFERENCE_CURRENT_WITH_SPIKES   
  
     """
     cat $filePath $spikesFile > ${assembly}--${spikesName}.fa.gz
@@ -336,7 +336,7 @@ process build_genome {
         tuple val(species), val(assembly), file(".done") into GENOME_REFERENCE
 
     """
-    build_asset.sh $assembly fasta fasta $filePath ${params.refgenieDir} 
+    build_asset.sh $assembly fasta fasta $filePath ${params.refgenieDir} genome
     """
 }
 
@@ -344,6 +344,7 @@ GENOME_REFERENCE
     .map{r -> tuple(r[0], r[1])}
     .into{
         GENOME_REFERENCE_FOR_GTF
+        GENOME_REFERENCE_FOR_CDNA
         GENOME_REFERENCE_FOR_HISAT
         GENOME_REFERENCE_FOR_BOWTIE2
     }
@@ -455,7 +456,7 @@ process build_annotation {
 
 CDNA_NEWEST
     .concat(CDNA_CURRENT)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1] + '_cdna_' + r[2].text, r[2].text, file(r[3].text), r[4])}
+    .map{r -> tuple(r[0], r[0] + '--' + r[1], r[2].text, file(r[3].text), r[4])}
     .into{
         CDNA_FOR_BUILD
         CDNA_FOR_SPIKES
@@ -464,18 +465,24 @@ CDNA_NEWEST
 process add_cdna_spikes {
     
     input:
-        tuple val(species), val(assembly), val(version), file(filePath), val(additionalTags), val(spikesName), file(spikesFile) from CDNA_FOR_SPIKES.combine(SPIKES_CDNA)
+        tuple val(species), val(assembly), val(version), file(filePath), val(additionalTag), val(spikesName), file(spikesFile) from CDNA_FOR_SPIKES.combine(SPIKES_CDNA)
 
     output:
-        tuple val(species), val("${assembly}--${spikesName}"), val(version), file("${assembly}--${spikesName}.fa.gz"), val(additionalTags) into CDNA_WITH_SPIKES   
+        tuple val(species), val("${assembly}--${spikesName}"), val(version), file("${assembly}--${spikesName}.fa.gz"), val("cdna_${version}-spikes_${spikesName},${additionalTag}-spikes_${spikesName}") into CDNA_WITH_SPIKES   
  
     """
     cat $filePath $spikesFile > ${assembly}--${spikesName}.fa.gz
     """
 }
 
-CDNA_FOR_BUILD
-    .concat(CDNA_WITH_SPIKES)
+// Again, this stuff just makes sure we're downstream of a genome build
+
+GENOME_REFERENCE_FOR_CDNA
+    .map{ r -> tuple(r[0] + r[1])}
+    .cross( CDNA_FOR_BUILD.concat(CDNA_WITH_SPIKES).map{ r -> tuple(r[0] + r[1], r[0], r[1], r[2], r[3], r[4]) } )
+    .map{ r -> r[1] }
+    .map{ r -> tuple( r[1], r[2], r[3], r[4], r[5]) }
+    .view()
     .set{
         CDNA_BUILD_INPUTS
     }
@@ -496,7 +503,7 @@ process build_cdna {
         tuple val(species), val("${assembly}"), val(version) into CDNA_REFERENCE
 
     """
-    build_asset.sh ${assembly} fasta fasta $filePath ${params.refgenieDir} $additionalTags
+    build_asset.sh ${assembly} fasta fasta $filePath ${params.refgenieDir} ${additionalTags}
     """
 }
 
