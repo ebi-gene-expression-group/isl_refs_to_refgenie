@@ -5,7 +5,7 @@ SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.t
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA_GTF = Channel.fromPath( "${baseDir}/spikes/*/*transcripts.gtf.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
-GENOMES = Channel.fromPath( "${params.islGenomes}" )
+GENOMES = Channel.fromPath( "${params.islGenomes}" ).splitText().map{r -> r.split()}.filter{ it.size() == 7 }.map{ r -> r*.toString() }
         
 ECOLI = Channel.of(['escherichia_coli', "${params.contamination.ecoli.assembly}", file("${params.contamination.ecoli.uri}")]).first()
 FUNGI = Channel.of(['fungi', "${params.contamination.fungi.assembly}", file("${params.contamination.fungi.uri}")]).first()
@@ -28,14 +28,17 @@ process find_config_species {
     """
 }
 
-// Extract general info on references from the top-level ISL genome config
+// Extract general info on references from the top-level ISL genome config and
+// combine with the current config
 
-IRAP_CONFIGS_BY_SPECIES
-    .unique()
-    .into{
-        IRAP_CONFIGS_FOR_RELEASE
-        IRAP_CONFIGS_FOR_ANNOTATE
-    }
+GENOMES
+  .join(IRAP_CONFIGS_BY_SPECIES.unique())
+  .into{
+    MERGED_CONFIG_FOR_RELEASE
+    MERGED_CONFIG_FOR_ANNOTATE
+    MERGED_CONFIG_FOR_NEWEST_VERSION
+    MERGED_CONFIG_FOR_BUILDS
+  }
 
 // Find out what version (Ensembl release etc) we have)
 
@@ -44,7 +47,7 @@ process find_curent_release {
     executor 'local'
 
     input:
-        tuple val(species), file(speciesConfig) from IRAP_CONFIGS_FOR_RELEASE
+        tuple val(species), file(speciesConfig) from MERGED_CONFIG_FOR_RELEASE.map { r -> tuple(r[0], r[7])}
 
     output:
         tuple val(species), stdout into CURRENT_VERSIONS
@@ -54,21 +57,12 @@ process find_curent_release {
     """
 }
 
-GENOMES
-  .splitText()
-  .map{ r -> r.split() } 
-  .filter{ it.size() == 7 }
-  .into{
-    GENOME_INFO_FOR_NEWEST_VERSION
-    GENOME_INFO_FOR_BUILDS
-  }
-
 process find_newest_release {
 
     executor 'local'
 
     input:
-        tuple val(species), val(gtfPattern) from GENOME_INFO_FOR_NEWEST_VERSION.map{ r -> tuple(r[0], r[5]) }
+        tuple val(species), val(gtfPattern) from MERGED_CONFIG_FOR_NEWEST_VERSION.map{ r -> tuple(r[0], r[5]) }
 
     output:
         tuple val(species), stdout into NEWEST_VERSIONS
@@ -78,7 +72,7 @@ process find_newest_release {
     """
 }
 
-GENOME_INFO_FOR_BUILDS
+MERGED_CONFIG_FOR_BUILDS
   .map{r -> tuple(r[0].toString(), [ 'reference', 'cdna_file', 'gtf_file' ], r[6].toString().replaceAll('\\.', '_'), r[2].toString(),[ r[3].toString(), r[4].toString(), r[5].toString().trim() ])}
   .join(CURRENT_VERSIONS)
   .join(NEWEST_VERSIONS)
@@ -96,7 +90,7 @@ process annotate_configline_with_species {
     executor 'local'
 
     input:
-        tuple val(species), file(speciesConfig) from IRAP_CONFIGS_FOR_ANNOTATE
+        tuple val(species), file(speciesConfig) from MERGED_CONFIG_FOR_ANNOTATE.map { r -> tuple(r[0], r[7])}
 
     output:
         file("${speciesConfig}.annotated") into ANNOTATED_CONFIGS
