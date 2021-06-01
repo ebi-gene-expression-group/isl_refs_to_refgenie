@@ -350,7 +350,7 @@ GENOME_REFERENCE
 
 process build_hisat_index {
  
-    maxForks 1
+    maxForks 20
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -375,7 +375,7 @@ process build_hisat_index {
 
 process build_bowtie2_index {
  
-    maxForks 1
+    maxForks 20
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -508,7 +508,7 @@ CDNA_REFERENCE
 
 process build_salmon_index {
  
-    maxForks 1
+    maxForks 20
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -531,7 +531,7 @@ process build_salmon_index {
 
 process build_kallisto_index {
  
-    maxForks 1
+    maxForks 20
 
     conda "${baseDir}/envs/refgenie.yml"
 
