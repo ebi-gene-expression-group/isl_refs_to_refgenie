@@ -344,6 +344,7 @@ GENOME_REFERENCE
     .map{r -> tuple(r[0], r[1])}
     .into{
         GENOME_REFERENCE_FOR_GTF
+        GENOME_REFERENCE_FOR_CDNA
         GENOME_REFERENCE_FOR_HISAT
         GENOME_REFERENCE_FOR_BOWTIE2
     }
@@ -474,8 +475,12 @@ process add_cdna_spikes {
     """
 }
 
-CDNA_FOR_BUILD
-    .concat(CDNA_WITH_SPIKES)
+
+GENOME_REFERENCE_FOR_CDNA
+    .map{ r -> tuple(r[0] + r[1])}
+    .cross( CDNA_FOR_BUILD.concat(CDNA_WITH_SPIKES).map{ r -> tuple(r[0] + r[1], r[0], r[1], r[2], r[3], r[4]) } )
+    .map{ r -> r[1] }
+    .map{ r -> tuple( r[1], r[2], r[3], r[4], r[5]) }
     .set{
         CDNA_BUILD_INPUTS
     }
