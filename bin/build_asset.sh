@@ -25,7 +25,7 @@ else
 
         if [ "$built" -eq 0 ]; then
             firsttag=$tag        
-            refgenieCommand="refgenie build $assembly/${recipe}:${firsttag} ${filePart}-c ${refgenieDir}/genome_config.yaml -R"
+            refgenieCommand="refgenie build $assembly/${recipe}:${firsttag} ${filePart}-c ${refgenieDir}/genome_config.yaml"
         else
             refgenieCommand="refgenie tag $assembly/${recipe}:${firsttag} --tag $tag"
         fi            
