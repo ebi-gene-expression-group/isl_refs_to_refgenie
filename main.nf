@@ -521,7 +521,6 @@ GENOME_REFERENCE_FOR_CDNA
     .cross( CDNA_FOR_BUILD.concat(CDNA_WITH_SPIKES).map{ r -> tuple(r[0] + r[1], r[0], r[1], r[2], r[3], r[4]) } )  
     .map{ r -> r[1] }
     .map{ r -> r[1..5] }
-    .view()
     .set{
         CDNA_BUILD_INPUTS
     }
