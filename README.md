@@ -19,7 +19,7 @@ nextflow run isl_refs_to_refgenie/main.nf \
 
 ## What's done
 
-![workflow schematic](flowcharg.png)
+![workflow schematic](flowchart.png)
 
 ### Input file
 
