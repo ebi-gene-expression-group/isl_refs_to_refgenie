@@ -314,7 +314,7 @@ process add_genome_spikes {
 
 process build_genome {
     
-    maxForks 20
+    maxForks 1
 
     memory { 2.GB * task.attempt }
 
@@ -356,7 +356,7 @@ REFERENCE_CURRENT_WITH_SPIKES
 
 process build_genome_with_spikes {
     
-    maxForks 20
+    maxForks 1
 
     memory { 2.GB * task.attempt }
 
@@ -528,7 +528,7 @@ GENOME_REFERENCE_FOR_CDNA
 process build_cdna {
  
     errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
-    maxRetries 10
+    maxRetries 1
     
     maxForks 1
     
