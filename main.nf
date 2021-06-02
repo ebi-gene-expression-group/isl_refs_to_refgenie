@@ -609,7 +609,7 @@ process build_kallisto_index {
         echo "\${at}--kallisto_v\${kallisto_version}"
     done | tr '\\n' ',' | sed 's/,\$//')  
     
-    build_asset.sh ${assembly} kallisto_index '' '' ${params.refgenieDir} \$tags '' \$cdna_asset
+    build_asset.sh ${assembly} kallisto_index '' '' ${params.refgenieDir} \$tags 'cdna_' \$cdna_asset
     """
 }
 
