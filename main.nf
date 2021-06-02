@@ -32,6 +32,7 @@ process find_config_species {
 // combine with the current config
 
 GENOMES
+  .filter{ it[0] == 'homo_sapiens' }
   .join(IRAP_CONFIGS_BY_SPECIES.unique())
   .into{
     MERGED_CONFIG_FOR_RELEASE
@@ -291,7 +292,7 @@ REFERENCE_CURRENT
     .map{ r -> tuple( r[0], r[1], file(r[2].text) ) }
     .concat(ECOLI, FUNGI, VIRUSES)
     .concat(CONTAMINATION_GENOMES_FOR_BUILD)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1].replace('.', '_'), r[2])}
+    .map{r -> tuple(r[0], r[0] + '--' + r[1].replace('.', '_'), r[2], 'genome')}
     .into{
         REFERENCE_CURRENT_FOR_BUILD
         REFERENCE_CURRENT_FOR_SPIKES
@@ -300,27 +301,21 @@ REFERENCE_CURRENT
 process add_genome_spikes {
     
     executor 'local'
-
+    
     input:
-        tuple val(species), val(assembly), file(filePath), val(spikesName), file(spikesFile) from REFERENCE_CURRENT_FOR_SPIKES.combine(SPIKES_GENOME)
+        tuple val(species), val(assembly), file(filePath), val(additionalTags), val(spikesName), file(spikesFile) from REFERENCE_CURRENT_FOR_SPIKES.combine(SPIKES_GENOME)
 
     output:
-        tuple val(species), val("${assembly}--${spikesName}"), file("${assembly}--${spikesName}.fa.gz") into REFERENCE_CURRENT_WITH_SPIKES   
+        tuple val(species), val("${assembly}"), file("${assembly}--${spikesName}.fa.gz"), val("genome--spikes_${spikesName}")  into REFERENCE_CURRENT_WITH_SPIKES   
  
     """
     cat $filePath $spikesFile > ${assembly}--${spikesName}.fa.gz
     """
 }
 
-REFERENCE_CURRENT_FOR_BUILD
-    .concat( REFERENCE_CURRENT_WITH_SPIKES)
-    .set{
-        GENOME_BUILD_INPUTS
-    }
-
 process build_genome {
     
-    maxForks 1
+    maxForks 20
 
     memory { 2.GB * task.attempt }
 
@@ -330,24 +325,57 @@ process build_genome {
     conda "${baseDir}/envs/refgenie.yml"
 
     input:
-        tuple val(species), val(assembly), file(filePath) from GENOME_BUILD_INPUTS
+        tuple val(species), val(assembly), file(filePath), val(additionalTags) from REFERENCE_CURRENT_FOR_BUILD
 
     output:
-        tuple val(species), val(assembly), file(".done") into GENOME_REFERENCE
+        tuple val(species), val(assembly), val(additionalTags), file(".done") into GENOME_REFERENCE
 
     """
-    build_asset.sh $assembly fasta fasta $filePath ${params.refgenieDir} 
+    build_asset.sh $assembly fasta fasta $filePath ${params.refgenieDir} ${additionalTags} 
     """
 }
 
 GENOME_REFERENCE
-    .map{r -> tuple(r[0], r[1])}
+    .map{r -> tuple(r[0], r[1], r[2])}
     .into{
+        GENOME_REFERENCE_FOR_SPIKES_GENOME
         GENOME_REFERENCE_FOR_GTF
         GENOME_REFERENCE_FOR_CDNA
         GENOME_REFERENCE_FOR_HISAT
         GENOME_REFERENCE_FOR_BOWTIE2
     }
+
+// We do the spikes geneome in a separate process so that we can hang it off
+// the plain genome
+
+REFERENCE_CURRENT_WITH_SPIKES
+    .combine(GENOME_REFERENCE_FOR_SPIKES_GENOME, by: [0,1])
+    .map{ r -> r[0..3]}
+    .set{
+        SPIKES_GENOME_INPUT
+    }
+
+process build_genome_with_spikes {
+    
+    maxForks 20
+
+    memory { 2.GB * task.attempt }
+
+    errorStrategy { task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry' : 'terminate' }
+    maxRetries 10
+ 
+    conda "${baseDir}/envs/refgenie.yml"
+
+    input:
+        tuple val(species), val(assembly), file(filePath), val(additionalTags) from SPIKES_GENOME_INPUT
+
+    output:
+        tuple val(species), val(assembly), val(additionalTags), file(".done") into SPIKES_GENOME_REFERENCE
+
+    """
+    build_asset.sh $assembly fasta fasta $filePath ${params.refgenieDir} ${additionalTags} 
+    """
+}
 
 process build_hisat_index {
  
@@ -361,14 +389,16 @@ process build_hisat_index {
     maxRetries 10
 
     input:
-        tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_HISAT
+        tuple val(species), val(assembly), val(additionalTags) from GENOME_REFERENCE_FOR_HISAT.concat(SPIKES_GENOME_REFERENCE.map{r -> tuple(r[0], r[1], r[2])})
 
     output:
         tuple val(species), file(".done") into HISAT_DONE
 
     """
     hisat2_version=\$(cat ${baseDir}/envs/refgenie.yml | grep hisat2 | awk -F'=' '{print \$2}')
-    build_asset.sh ${assembly} hisat2_index '' '' ${params.refgenieDir} v\${hisat2_version}
+    tags=${additionalTags}--hisat\${hisat2_version}
+    genome_asset="fasta=${assembly}/fasta:${additionalTags}"
+    build_asset.sh ${assembly} hisat2_index '' '' ${params.refgenieDir} ${additionalTags}--hisat2_v\${hisat2_version}
     """
 }
 
@@ -402,6 +432,7 @@ process build_bowtie2_index {
 GTF_NEWEST
     .concat(GTF_CURRENT)
     .map{r -> tuple(r[0], r[0] + '--' + r[1], r[2].text, file(r[3].text), r[4])}
+    .map{r -> tuple(r[0], r[1], r[2], r[3], r[2]+','+r[4]) }
     .into{
         GTF_FOR_BUILD
         GTF_FOR_SPIKES
@@ -413,10 +444,15 @@ process add_genome_gtf_spikes {
         tuple val(species), val(assembly), val(version), file(filePath), val(additionalTags), val(spikesName), file(spikesFile) from GTF_FOR_SPIKES.combine(SPIKES_GTF)
 
     output:
-        tuple val(species), val("${assembly}--${spikesName}"), val(version), file("${assembly}_${version}--${spikesName}.gtf.gz"), val(additionalTags) into GTF_WITH_SPIKES   
+        tuple val(species), val(assembly), val(version), file("${assembly}_${version}--${spikesName}.gtf.gz"), stdout into GTF_WITH_SPIKES   
  
     """
     cat $filePath $spikesFile > ${assembly}_${version}--${spikesName}.gtf.gz
+    
+    # Append the spikes name to all the input tags
+    for at in \$(echo ${additionalTags} | tr "," "\\n"); do
+        echo "\${at}--spikes_${spikesName}"
+    done | tr '\\n' ',' | sed 's/,\$//'   
     """
 }
 
@@ -456,7 +492,8 @@ process build_annotation {
 
 CDNA_NEWEST
     .concat(CDNA_CURRENT)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1] + '_cdna_' + r[2].text, r[2].text, file(r[3].text), r[4])}
+    .map{r -> tuple(r[0], r[0] + '--' + r[1], r[2].text, file(r[3].text), r[4])}
+    .map{r -> tuple(r[0], r[1], r[2], r[3], r[2]+','+r[4]) }
     .into{
         CDNA_FOR_BUILD
         CDNA_FOR_SPIKES
@@ -468,19 +505,24 @@ process add_cdna_spikes {
         tuple val(species), val(assembly), val(version), file(filePath), val(additionalTags), val(spikesName), file(spikesFile) from CDNA_FOR_SPIKES.combine(SPIKES_CDNA)
 
     output:
-        tuple val(species), val("${assembly}--${spikesName}"), val(version), file("${assembly}--${spikesName}.fa.gz"), val(additionalTags) into CDNA_WITH_SPIKES   
+        tuple val(species), val(assembly), val(version), file("${assembly}--${spikesName}.fa.gz"), stdout into CDNA_WITH_SPIKES   
  
     """
     cat $filePath $spikesFile > ${assembly}--${spikesName}.fa.gz
+
+    # Append the spikes name to all the input tags
+    for at in \$(echo ${additionalTags} | tr "," "\\n"); do
+        echo "\${at}--spikes_${spikesName}"
+    done | tr '\\n' ',' | sed 's/,\$//'   
     """
 }
 
-
 GENOME_REFERENCE_FOR_CDNA
-    .map{ r -> tuple(r[0] + r[1])}
-    .cross( CDNA_FOR_BUILD.concat(CDNA_WITH_SPIKES).map{ r -> tuple(r[0] + r[1], r[0], r[1], r[2], r[3], r[4]) } )
+    .map{ r -> tuple(r[0].toString() + r[1])}
+    .cross( CDNA_FOR_BUILD.concat(CDNA_WITH_SPIKES).map{ r -> tuple(r[0] + r[1], r[0], r[1], r[2], r[3], r[4]) } )  
     .map{ r -> r[1] }
-    .map{ r -> tuple( r[1], r[2], r[3], r[4], r[5]) }
+    .map{ r -> r[1..5] }
+    .view()
     .set{
         CDNA_BUILD_INPUTS
     }
@@ -498,10 +540,10 @@ process build_cdna {
         tuple val(species), val(assembly), val(version), file(filePath), val(additionalTags) from CDNA_BUILD_INPUTS
 
     output:
-        tuple val(species), val("${assembly}"), val(version) into CDNA_REFERENCE
+        tuple val(species), val("${assembly}"), val(version), val(additionalTags) into CDNA_REFERENCE
 
     """
-    build_asset.sh ${assembly} fasta fasta $filePath ${params.refgenieDir} $additionalTags
+    build_asset.sh ${assembly} fasta fasta $filePath ${params.refgenieDir} ${additionalTags} cdna_
     """
 }
 
@@ -523,14 +565,21 @@ process build_salmon_index {
     maxRetries 10
 
     input:
-        tuple val(species), val(assembly), val(version) from CDNA_REFERENCE_FOR_SALMON
+        tuple val(species), val(assembly), val(version), val(additionalTags) from CDNA_REFERENCE_FOR_SALMON
 
     output:
         tuple val(species), file(".done") into SALMON_DONE
 
     """
     salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
-    build_asset.sh ${assembly} salmon_index '' '' ${params.refgenieDir} v\${salmon_version}
+    cdna_asset="fasta=${assembly}/fasta:cdna_\$(echo "${additionalTags}" | awk -F',' '{print \$1}')"
+    
+    # Append the salmon version to all the input tags
+    tags=\$(for at in \$(echo ${additionalTags} | tr "," "\\n"); do
+        echo "\${at}--salmon_v\${salmon_version}"
+    done | tr '\\n' ',' | sed 's/,\$//')  
+
+    build_asset.sh ${assembly} salmon_index '' '' ${params.refgenieDir} \$tags 'cdna_' \$cdna_asset
     """
 }
 
@@ -546,14 +595,21 @@ process build_kallisto_index {
     maxRetries 10
 
     input:
-        tuple val(species), val(assembly), val(version) from CDNA_REFERENCE_FOR_KALLISTO
+        tuple val(species), val(assembly), val(version), val(additionalTags) from CDNA_REFERENCE_FOR_KALLISTO
 
     output:
         tuple val(species), file(".done") into KALLISTO_DONE
 
     """
     kallisto_version=\$(cat ${baseDir}/envs/refgenie.yml | grep kallisto | awk -F'=' '{print \$2}')
-    build_asset.sh ${assembly} kallisto_index '' '' ${params.refgenieDir} v\${kallisto_version}
+    cdna_asset="fasta=${assembly}/fasta:cdna_${version}"
+    
+    # Append the kallisto version to all the input tags
+    tags=\$(for at in \$(echo ${additionalTags} | tr "," "\\n"); do
+        echo "\${at}--kallisto_v\${kallisto_version}"
+    done | tr '\\n' ',' | sed 's/,\$//')  
+    
+    build_asset.sh ${assembly} kallisto_index '' '' ${params.refgenieDir} \$tags '' \$cdna_asset
     """
 }
 
