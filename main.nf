@@ -32,7 +32,6 @@ process find_config_species {
 // combine with the current config
 
 GENOMES
-  .filter{ it[0] == 'homo_sapiens' }
   .join(IRAP_CONFIGS_BY_SPECIES.unique())
   .into{
     MERGED_CONFIG_FOR_RELEASE
