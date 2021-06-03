@@ -78,14 +78,20 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
 
     echo $refgenieCommand
     eval $refgenieCommand
-   
-    if [ -e "$completedFlag" ]; then
-        echo "Refgenie build process successful"
-        built=1
+  
+    if [ $? -ne 0 ]; then
+	echo "Refgenie build returned non-zero exit status" 1>&2
+	exit 1
     else
-        echo "Refgenie build process failed, '$completedFlag' not present" 1>&2
-        exit 1
+        if [ -e "$completedFlag" ]; then
+            echo "Refgenie build process successful"
+            built=1
+        else
+            echo "Refgenie build process failed, '$completedFlag' not present" 1>&2
+            exit 1
+        fi
     fi
+
 done
 
 touch .done
