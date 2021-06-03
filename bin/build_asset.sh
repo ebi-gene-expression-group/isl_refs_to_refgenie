@@ -67,6 +67,13 @@ firsttag=
 for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
     completedFlag="${refgenieDir}/alias/$assembly/$recipe/${tagPrefix}$tag/_refgenie_build/refgenie_completed.flag"
 
+    refgenie seek ${assembly}/${recipe}:${tag} > /dev/null 2>&1
+
+    if [ $? -eq 0 ]; then
+        echo "Asset ${assembly}/${recipe}:${tag} already present"
+        continue
+    fi
+
     if [ "$built" -eq 0 ]; then
         firsttag=$tag        
         refgenieCommand="refgenie build $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
