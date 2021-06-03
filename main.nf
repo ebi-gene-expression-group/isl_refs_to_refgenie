@@ -600,7 +600,7 @@ process build_kallisto_index {
 
     """
     kallisto_version=\$(cat ${baseDir}/envs/refgenie.yml | grep kallisto | awk -F'=' '{print \$2}')
-    cdna_asset="fasta=${assembly}/fasta:cdna_${version}"
+    cdna_asset="fasta=${assembly}/fasta:cdna_\$(echo "${additionalTags}" | awk -F',' '{print \$1}')"
     
     # Append the kallisto version to all the input tags
     tags=\$(for at in \$(echo ${additionalTags} | tr "," "\\n"); do
