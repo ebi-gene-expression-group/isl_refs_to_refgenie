@@ -32,6 +32,7 @@ process find_config_species {
 // combine with the current config
 
 GENOMES
+  .filter{ it[0] == 'homo_sapiens' }
   .join(IRAP_CONFIGS_BY_SPECIES.unique())
   .into{
     MERGED_CONFIG_FOR_RELEASE
@@ -330,7 +331,17 @@ process build_genome {
         tuple val(species), val(assembly), val(additionalTags), file(".done") into GENOME_REFERENCE
 
     """
-    build_asset.sh $assembly fasta fasta $filePath ${params.refgenieDir} ${additionalTags} 
+    rebuild=''
+    if [ "${task.attempt}" -gt 1 ]; then
+        rebuild=' -b true'
+    fi
+    build_asset.sh \
+        -a $assembly \
+        -r fasta \
+        -f fasta \
+        -p $filePath \
+        -d ${params.refgenieDir} \
+        -t ${additionalTags}\${rebuild} 
     """
 }
 
@@ -372,7 +383,18 @@ process build_genome_with_spikes {
         tuple val(species), val(assembly), val(additionalTags), file(".done") into SPIKES_GENOME_REFERENCE
 
     """
-    build_asset.sh $assembly fasta fasta $filePath ${params.refgenieDir} ${additionalTags} 
+    rebuild=''
+    if [ "${task.attempt}" -gt 1 ]; then
+        rebuild=' -b true'
+    fi
+
+    build_asset.sh \
+        -a $assembly \
+        -r fasta \
+        -f fasta \
+        -p $filePath \
+        -d ${params.refgenieDir} \
+        -t ${additionalTags}\${rebuild} 
     """
 }
 
@@ -397,7 +419,17 @@ process build_hisat_index {
     hisat2_version=\$(cat ${baseDir}/envs/refgenie.yml | grep hisat2 | awk -F'=' '{print \$2}')
     tags=${additionalTags}--hisat\${hisat2_version}
     genome_asset="fasta=${assembly}/fasta:${additionalTags}"
-    build_asset.sh ${assembly} hisat2_index '' '' ${params.refgenieDir} ${additionalTags}--hisat2_v\${hisat2_version}
+    
+    rebuild=''
+    if [ "${task.attempt}" -gt 1 ]; then
+        rebuild=' -b true'
+    fi
+
+    build_asset.sh \
+        -a ${assembly} \
+        -r hisat2_index \
+        -d ${params.refgenieDir} \
+        -t ${additionalTags}--hisat2_v\${hisat2_version}\${rebuild}
     """
 }
 
@@ -422,7 +454,15 @@ process build_bowtie2_index {
 
     """
     bowtie2_version=\$(cat ${baseDir}/envs/refgenie.yml | grep bowtie2 | awk -F'=' '{print \$2}')
-    build_asset.sh ${assembly} bowtie2_index '' '' ${params.refgenieDir} v\${bowtie2_version}
+    rebuild=''
+    if [ "${task.attempt}" -gt 1 ]; then
+        rebuild=' -b true'
+    fi
+    build_asset.sh \
+        -a ${assembly} \
+        -r bowtie2_index \
+        -d ${params.refgenieDir} \
+        -t v\${bowtie2_version}\${rebuild}
     """
 }
 
@@ -483,7 +523,17 @@ process build_annotation {
         tuple val(species), file(".done") into ANNOTATION_DONE
 
     """
-    build_asset.sh $assembly ensembl_gtf ensembl_gtf $filePath ${params.refgenieDir} ${additionalTags}
+    rebuild=''
+    if [ "${task.attempt}" -gt 1 ]; then
+        rebuild=' -b true'
+    fi
+    build_asset.sh \
+        -a $assembly \
+        -r ensembl_gtf \
+        -f ensembl_gtf  \
+        -p $filePath \
+        -d ${params.refgenieDir} \
+        -t ${additionalTags}\${rebuild}
     """
 }
 
@@ -541,7 +591,18 @@ process build_cdna {
         tuple val(species), val("${assembly}"), val(version), val(additionalTags) into CDNA_REFERENCE
 
     """
-    build_asset.sh ${assembly} fasta fasta $filePath ${params.refgenieDir} ${additionalTags} cdna_
+    rebuild=''
+    if [ "${task.attempt}" -gt 1 ]; then
+        rebuild=' -b true'
+    fi
+    build_asset.sh \
+        -a ${assembly} \
+        -r fasta \
+        -f fasta \
+        -p $filePath \
+        -d ${params.refgenieDir} \
+        -t ${additionalTags} \
+        -x cdna_ \${rebuild}
     """
 }
 
@@ -577,7 +638,17 @@ process build_salmon_index {
         echo "\${at}--salmon_v\${salmon_version}"
     done | tr '\\n' ',' | sed 's/,\$//')  
 
-    build_asset.sh ${assembly} salmon_index '' '' ${params.refgenieDir} \$tags 'cdna_' \$cdna_asset
+    rebuild=''
+    if [ "${task.attempt}" -gt 1 ]; then
+        rebuild=' -b true'
+    fi
+    build_asset.sh \
+        -a ${assembly} \
+        -r salmon_index \
+        -d ${params.refgenieDir} \
+        -t \$tags \
+        -x 'cdna_' \
+        -s \$cdna_asset \${rebuild}
     """
 }
 
@@ -607,7 +678,17 @@ process build_kallisto_index {
         echo "\${at}--kallisto_v\${kallisto_version}"
     done | tr '\\n' ',' | sed 's/,\$//')  
     
-    build_asset.sh ${assembly} kallisto_index '' '' ${params.refgenieDir} \$tags 'cdna_' \$cdna_asset
+    rebuild=''
+    if [ "${task.attempt}" -gt 1 ]; then
+        rebuild=' -b true'
+    fi
+    build_asset.sh \
+        -a ${assembly} \
+        -r kallisto_index \
+        -d ${params.refgenieDir} \
+        -t \$tags \
+        -x 'cdna_' \
+        -s \$cdna_asset \${rebuild}
     """
 }
 

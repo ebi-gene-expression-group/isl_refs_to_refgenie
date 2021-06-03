@@ -1,54 +1,91 @@
 #!/usr/bin/env bash
 
-assembly=$1
-recipe=$2
-fileType=$3
-filePath=$4
-refgenieDir=$5
-tags=${6:-'default'}
-tagPrefix=${7:-''}
-assets=${8:-''}
+usage() { echo "Usage: $0 [ -a <assembly> ] [ -r <recipe> ] [ -f <file type> ] [ -p <file path> ] [ -d <refgenie directory> ] [ -t <comma-separated tags> ] [ -x <tag prefix> ] [ -s <assets> ] [ -b <force rebuild?> ]" 1>&2; }
 
-# Assemblies or tags with '.' cause refgenie errors
+assembly=
+recipe=
+fileType=
+filePath=
+refgenieDir=
+tags=default
+tagPrefix=
+assets=
+forceRebuild=
 
-if [ -e "$completedFlag" ]; then
-    echo "$completedFlag already present, $recipe build cancelled" 1>&2
-else
-    filePart=''
-    assetsPart=''
-    if [ -n "$fileType" ]; then
-        filePart="--files $fileType=$filePath "
-    elif [ -n "$assets" ]; then
-        assetsPart="--assets $assets "
-    fi
+while getopts ":a:r:f:p:d:t:x:s:b:" o; do
+    case "${o}" in
+        a)
+            assembly=${OPTARG}
+            ;;
+        r)
+            recipe=${OPTARG}
+            ;;
+        f)
+            fileType=${OPTARG}
+            ;;
+        p)
+            filePath=${OPTARG}
+            ;;
+        d)
+            refgenieDir=${OPTARG}
+            ;;
+        t)
+            tags=${OPTARG}
+            ;;
+        x)
+            tagPrefix=${OPTARG}
+            ;;
+        s)
+            assets=${OPTARG}
+            ;;
+        b)
+            forceRebuild=${OPTARG}
+            ;;
+        *)
+            usage
+            exit 0
+            ;;
+    esac
+done
+shift $((OPTIND-1))
 
-    built=0
-    firsttag=
-
-    for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
-        completedFlag="${refgenieDir}/alias/$assembly/$recipe/${tagPrefix}$tag/_refgenie_build/refgenie_completed.flag"
-
-        if [ "$built" -eq 0 ]; then
-            firsttag=$tag        
-            refgenieCommand="refgenie build $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml"
-        else
-            # See https://github.com/refgenie/refgenie/issues/252
-            #refgenieCommand="refgenie tag $assembly/${recipe}:${firsttag} --tag $tag -c ${refgenieDir}/genome_config.yaml"
-            refgenieCommand="refgenie build $assembly/${recipe}:${tagPrefix}${tag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml"
-        fi            
-
-        echo $refgenieCommand
-        eval $refgenieCommand
-       
-        if [ -e "$completedFlag" ]; then
-            echo "Refgenie build process successful"
-            built=1
-        else
-            echo "Refgenie build process failed, '$completedFlag' not present" 1>&2
-            exit 1
-        fi
-    done
-
+filePart=''
+assetsPart=''
+rebuildPart=''
+if [ -n "$fileType" ]; then
+    filePart="--files $fileType=$filePath "
+elif [ -n "$assets" ]; then
+    assetsPart="--assets $assets "
 fi
+if [ -n "$forceRebuild" ]; then
+    rebuildPart='-R '
+fi
+
+built=0
+firsttag=
+
+for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
+    completedFlag="${refgenieDir}/alias/$assembly/$recipe/${tagPrefix}$tag/_refgenie_build/refgenie_completed.flag"
+
+    if [ "$built" -eq 0 ]; then
+        firsttag=$tag        
+        refgenieCommand="refgenie build $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
+    else
+        # See https://github.com/refgenie/refgenie/issues/252
+        #refgenieCommand="refgenie tag $assembly/${recipe}:${firsttag} --tag $tag -c ${refgenieDir}/genome_config.yaml"
+        refgenieCommand="refgenie build $assembly/${recipe}:${tagPrefix}${tag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
+    fi            
+
+    echo $refgenieCommand
+    eval $refgenieCommand
+   
+    if [ -e "$completedFlag" ]; then
+        echo "Refgenie build process successful"
+        built=1
+    else
+        echo "Refgenie build process failed, '$completedFlag' not present" 1>&2
+        exit 1
+    fi
+done
 
 touch .done
