@@ -483,7 +483,7 @@ process build_annotation {
         tuple val(species), file(".done") into ANNOTATION_DONE
 
     """
-    build_asset.sh $assembly ensembl_gtf ensembl_gtf $filePath ${params.refgenieDir} ${version},${additionalTags}
+    build_asset.sh $assembly ensembl_gtf ensembl_gtf $filePath ${params.refgenieDir} ${additionalTags}
     """
 }
 
