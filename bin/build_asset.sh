@@ -57,9 +57,9 @@ if [ -n "$fileType" ]; then
 elif [ -n "$assets" ]; then
     assetsPart="--assets $assets "
 fi
-if [ -n "$forceRebuild" ]; then
+#if [ -n "$forceRebuild" ]; then
     #rebuildPart=' -R '
-fi
+#fi
 
 built=0
 firsttag=
