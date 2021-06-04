@@ -602,7 +602,7 @@ process build_cdna {
     fi
     build_asset.sh \
         -a ${assembly} \
-        -r fasta \
+        -r fasta_txome \
         -f fasta \
         -p $filePath \
         -d ${params.refgenieDir} \
@@ -636,7 +636,7 @@ process build_salmon_index {
 
     """
     salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
-    cdna_asset="fasta=${assembly}/fasta:cdna_\$(echo "${additionalTags}" | awk -F',' '{print \$1}')"
+    cdna_asset="fasta=${assembly}/fasta_txome:cdna_\$(echo "${additionalTags}" | awk -F',' '{print \$1}')"
     
     # Append the salmon version to all the input tags
     tags=\$(for at in \$(echo ${additionalTags} | tr "," "\\n"); do
@@ -676,7 +676,7 @@ process build_kallisto_index {
 
     """
     kallisto_version=\$(cat ${baseDir}/envs/refgenie.yml | grep kallisto | awk -F'=' '{print \$2}')
-    cdna_asset="fasta=${assembly}/fasta:cdna_\$(echo "${additionalTags}" | awk -F',' '{print \$1}')"
+    cdna_asset="fasta=${assembly}/fasta_txome:cdna_\$(echo "${additionalTags}" | awk -F',' '{print \$1}')"
     
     # Append the kallisto version to all the input tags
     tags=\$(for at in \$(echo ${additionalTags} | tr "," "\\n"); do
