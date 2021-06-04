@@ -318,7 +318,7 @@ process build_genome {
 
     memory { 2.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 5  ? 'retry': 'ignore' }
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
     maxRetries 10
  
     conda "${baseDir}/envs/refgenie.yml"
@@ -361,7 +361,7 @@ process build_hisat_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 5  ? 'retry': 'ignore' }
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
     maxRetries 10
 
     input:
@@ -399,7 +399,7 @@ process build_bowtie2_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 5  ? 'retry': 'ignore' }
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
     maxRetries 10
 
     input:
@@ -460,7 +460,7 @@ GENOME_REFERENCE_FOR_GTF
 
 process build_annotation {
     
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 5  ? 'retry': 'ignore' }
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
     maxRetries 10
     
     maxForks 1
@@ -523,8 +523,8 @@ GENOME_REFERENCE_FOR_CDNA
 
 process build_cdna {
  
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 5  ? 'retry': 'ignore' }
-    maxRetries 1
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
+    maxRetries 10
     
     maxForks 1
     
@@ -566,7 +566,7 @@ process build_salmon_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 5  ? 'retry': 'ignore' }
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
     maxRetries 10
 
     input:
@@ -606,7 +606,7 @@ process build_kallisto_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 5  ? 'retry': 'ignore' }
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
     maxRetries 10
 
     input:
