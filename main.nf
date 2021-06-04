@@ -397,9 +397,15 @@ process build_genome_with_spikes {
     """
 }
 
+GENOME_REFERENCE_FOR_HISAT
+    .concat(SPIKES_GENOME_REFERENCE.map{r -> tuple(r[0], r[1], r[2])})
+    .set{
+        HISAT_BUILD_INPUTS
+    }
+
 process build_hisat_index {
  
-    maxForks 5
+    maxForks 1
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -409,7 +415,7 @@ process build_hisat_index {
     maxRetries 10
 
     input:
-        tuple val(species), val(assembly), val(additionalTags) from GENOME_REFERENCE_FOR_HISAT.concat(SPIKES_GENOME_REFERENCE.map{r -> tuple(r[0], r[1], r[2])})
+        tuple val(species), val(assembly), val(additionalTags) from HISAT_BUILD_INPUTS
 
     output:
         tuple val(species), file(".done") into HISAT_DONE
@@ -436,7 +442,7 @@ process build_hisat_index {
 
 process build_bowtie2_index {
  
-    maxForks 5
+    maxForks 1
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -613,7 +619,7 @@ CDNA_REFERENCE
 
 process build_salmon_index {
  
-    maxForks 5
+    maxForks 1
 
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -653,7 +659,7 @@ process build_salmon_index {
 
 process build_kallisto_index {
  
-    maxForks 5
+    maxForks 1
 
     conda "${baseDir}/envs/refgenie.yml"
 
