@@ -34,7 +34,7 @@ Input files are discovered for each species:
 
 ### Building Refgenie assets
 
-The plain base genome FASTA is used as the root asset for an assembly. All others (cDNAs, GTFs etc) are sub-assets of that. Genomes, transcriptomes and GTFs are also combined with spike-ins (currently just ERCC) and built/indexed under the same root asset.
+The plain base genome FASTA is used as the root asset for an assembly. All others (cDNAs, GTFs etc) are sub-assets of that. Genomes, transcriptomes and GTFs are also combined with spike-ins (currently just ERCC) and built/indexed under a separate root asset.
 
 ### Genome indices
 
@@ -46,54 +46,77 @@ Each of the 4 transcriptome assets for each species (current and newest, with/wi
 
 ## Result
 
-Top-level resources are named like `species--assembly':
+Top-level resources are named like ``species--assembly[--spikesname]`:
 
 ```
 > refgenie list
-                                                                 Local refgenie assets                                                                 
-                                                  Server subscriptions: http://refgenomes.databio.org                                                  
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ genome                                                                                           ┃ assets                                            ┃
-┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ escherichia_coli--str_k_12_substr_mg1655_ASM584v2                                                │ fasta, hisat2_index                               │
-│ viruses--refseq_viral_2_1                                                                        │ fasta, hisat2_index                               │
-│ fungi--refseq_fungi_53                                                                           │ fasta, hisat2_index                               │
-│ escherichia_coli-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_viral_2_1                       │ fasta, hisat2_index, bowtie2_index                │
-│ escherichia_coli-fungi--str_k_12_substr_mg1655_ASM584v2-refseq_fungi_53                          │ fasta, hisat2_index, bowtie2_index                │
-│ fungi-viruses--refseq_fungi_53-refseq_viral_2_1                                                  │ fasta, hisat2_index, bowtie2_index                │
-│ escherichia_coli-fungi-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_fungi_53-refseq_viral_2_1 │ fasta, hisat2_index, bowtie2_index                │
-│ homo_sapiens--GRCh38                                                                             │ fasta, ensembl_gtf, salmon_index, kallisto_index  │
-│                                                                                                  │ hisat2_index                                      │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┴───────────────────────────────────────────────────┘
-                                                 use refgenie list -g <genome> for more detailed view                                                  
+                                                                     Local refgenie assets                                                                     
+                                                      Server subscriptions: http://refgenomes.databio.org                                                      
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ genome                                                                        ┃ assets                                                                      ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ homo_sapiens--GRCh38                                                          │ fasta, fasta_txome, ensembl_gtf, salmon_index, kallisto_index, hisat2_index │
+│ homo_sapiens--GRCh38--spikes_ercc                                             │ fasta, fasta_txome, ensembl_gtf, salmon_index, kallisto_index, hisat2_index │
+│ escherichia_coli--str_k_12_substr_mg1655_ASM584v2                             │ fasta, hisat2_index                                                         │
+│ fungi--refseq_fungi_53                                                        │ fasta, hisat2_index                                                         │
+│ viruses--refseq_viral_2_1                                                     │ fasta, hisat2_index                                                         │
+│ escherichia_coli-fungi--str_k_12_substr_mg1655_ASM584v2-refseq_fungi_53       │ fasta, bowtie2_index, hisat2_index                                          │
+│ fungi-viruses--refseq_fungi_53-refseq_viral_2_1                               │ fasta, hisat2_index, bowtie2_index                                          │
+│ escherichia_coli-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_viral_2_1    │ fasta, hisat2_index, bowtie2_index                                          │
+│ escherichia_coli-fungi-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_fungi… │ fasta, hisat2_index, bowtie2_index                                          │
+│ escherichia_coli--str_k_12_substr_mg1655_ASM584v2--spikes_ercc                │ fasta, hisat2_index                                                         │
+│ fungi--refseq_fungi_53--spikes_ercc                                           │ fasta, hisat2_index                                                         │
+│ viruses--refseq_viral_2_1--spikes_ercc                                        │ fasta, hisat2_index                                                         │
+│ escherichia_coli-fungi--str_k_12_substr_mg1655_ASM584v2-refseq_fungi_53--spi… │ fasta, hisat2_index                                                         │
+│ escherichia_coli-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_viral_2_1--… │ fasta, hisat2_index                                                         │
+│ escherichia_coli-fungi-viruses--str_k_12_substr_mg1655_ASM584v2-refseq_fungi… │ fasta, hisat2_index                                                         │
+│ fungi-viruses--refseq_fungi_53-refseq_viral_2_1--spikes_ercc                  │ fasta, hisat2_index                                                         │
+└───────────────────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────────────┘
+                                                     use refgenie list -g <genome> for more detailed view                                                      
 ```
 
-Child assets for an assembly are named to indicate their type (e.g. genome, cDNA) where that's not clear from the asset type, the associated genome resource (e.g. Ensembl) releases, with the spikes they contain (where applicable), and by the version of software used to generate them (where applicable, specifically indexes):
+(note the separate spike-in genomes for the main species, only human here).
+
+Child assets for an assembly are named to indicate their type (e.g. genome, cDNA) where that's not clear from the asset type, the associated genome resource (e.g. Ensembl) releases, and by the version of software used to generate them (where applicable, specifically indexes):
 
 ```
 > refgenie list -g homo_sapiens--GRCh38
-                                                                        Local refgenie assets                                                                         
-                                                         Server subscriptions: http://refgenomes.databio.org                                                          
-┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ genome               ┃ asset (seek_keys)                                              ┃ tags                                                                       ┃
-┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
-│ homo_sapiens--GRCh38 │ fasta (fasta, fai, chrom_sizes, dir)                           │ genome, cdna_ensembl104, cdna_newest, cdna_ensembl95, cdna_current,        │
-│                      │                                                                │ genome--spikes_ercc, cdna_ensembl95--spikes_ercc,                          │
-│                      │                                                                │ cdna_current--spikes_ercc, cdna_ensembl104--spikes_ercc,                   │
-│                      │                                                                │ cdna_newest--spikes_ercc                                                   │
-│ homo_sapiens--GRCh38 │ ensembl_gtf (ensembl_gtf, ensembl_tss, ensembl_gene_body, dir) │ ensembl104, newest, ensembl95, current, ensembl95--spikes_ercc,            │
-│                      │                                                                │ current--spikes_ercc, ensembl104--spikes_ercc, newest--spikes_ercc         │
-│ homo_sapiens--GRCh38 │ salmon_index (salmon_index, dir)                               │ cdna_ensembl104--salmon_v1.2.0, cdna_ensembl95--salmon_v1.2.0,             │
-│                      │                                                                │ cdna_ensembl95--spikes_ercc--salmon_v1.2.0, cdna_newest--salmon_v1.2.0,    │
-│                      │                                                                │ cdna_ensembl104--spikes_ercc--salmon_v1.2.0, cdna_current--salmon_v1.2.0,  │
-│                      │                                                                │ cdna_current--spikes_ercc--salmon_v1.2.0,                                  │
-│                      │                                                                │ cdna_newest--spikes_ercc--salmon_v1.2.0                                    │
-│ homo_sapiens--GRCh38 │ kallisto_index (kallisto_index, dir)                           │ ensembl95--kallisto_v0.45.0, ensembl104--kallisto_v0.45.0,                 │
-│                      │                                                                │ ensembl95--spikes_ercc--kallisto_v0.45.0,                                  │
-│                      │                                                                │ ensembl104--spikes_ercc--kallisto_v0.45.0, current--kallisto_v0.45.0,      │
-│                      │                                                                │ current--spikes_ercc--kallisto_v0.45.0, newest--kallisto_v0.45.0,          │
-│                      │                                                                │ newest--spikes_ercc--kallisto_v0.45.0                                      │
-│ homo_sapiens--GRCh38 │ hisat2_index (hisat2_index, dir)                               │ genome--hisat2_v2.1.0, genome--spikes_ercc--hisat2_v2.1.0                  │
-└──────────────────────┴────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────────────────────┘
+
+                                                                     Local refgenie assets                                                                     
+                                                      Server subscriptions: http://refgenomes.databio.org                                                      
+┏━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ genome               ┃ asset (seek_keys)                                              ┃ tags                                                                ┃
+┡━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ homo_sapiens--GRCh38 │ fasta (fasta, fai, chrom_sizes, dir)                           │ genome                                                              │
+│ homo_sapiens--GRCh38 │ fasta_txome (fasta_txome, fai, chrom_sizes, dir)               │ cdna_ensembl104, cdna_newest, cdna_ensembl95, cdna_current          │
+│ homo_sapiens--GRCh38 │ ensembl_gtf (ensembl_gtf, ensembl_tss, ensembl_gene_body, dir) │ ensembl104, newest, ensembl95, current                              │
+│ homo_sapiens--GRCh38 │ salmon_index (salmon_index, dir)                               │ cdna_ensembl104--salmon_v1.2.0, cdna_ensembl95--salmon_v1.2.0,      │
+│                      │                                                                │ cdna_newest--salmon_v1.2.0, cdna_current--salmon_v1.2.0             │
+│ homo_sapiens--GRCh38 │ kallisto_index (kallisto_index, dir)                           │ cdna_ensembl104--kallisto_v0.45.0,                                  │
+│                      │                                                                │ cdna_ensembl95--kallisto_v0.45.0, cdna_current--kallisto_v0.45.0,   │
+│                      │                                                                │ cdna_newest--kallisto_v0.45.0                                       │
+│ homo_sapiens--GRCh38 │ hisat2_index (hisat2_index, dir)                               │ genome--hisat2_v2.1.0                                               │
+└──────────────────────┴────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────┘
+
+> refgenie list -g  homo_sapiens--GRCh38--spikes_ercc
+                                                                     Local refgenie assets                                                                     
+                                                      Server subscriptions: http://refgenomes.databio.org                                                      
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ genome                            ┃ asset (seek_keys)                                          ┃ tags                                                       ┃
+┡━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ homo_sapiens--GRCh38--spikes_ercc │ fasta (fasta, fai, chrom_sizes, dir)                       │ genome                                                     │
+│ homo_sapiens--GRCh38--spikes_ercc │ fasta_txome (fasta_txome, fai, chrom_sizes, dir)           │ cdna_ensembl95, cdna_current, cdna_ensembl104, cdna_newest │
+│ homo_sapiens--GRCh38--spikes_ercc │ ensembl_gtf (ensembl_gtf, ensembl_tss, ensembl_gene_body,  │ ensembl104, newest, ensembl95, current                     │
+│                                   │ dir)                                                       │                                                            │
+│ homo_sapiens--GRCh38--spikes_ercc │ salmon_index (salmon_index, dir)                           │ cdna_ensembl95--salmon_v1.2.0,                             │
+│                                   │                                                            │ cdna_ensembl104--salmon_v1.2.0,                            │
+│                                   │                                                            │ cdna_current--salmon_v1.2.0, cdna_newest--salmon_v1.2.0    │
+│ homo_sapiens--GRCh38--spikes_ercc │ kallisto_index (kallisto_index, dir)                       │ cdna_ensembl95--kallisto_v0.45.0,                          │
+│                                   │                                                            │ cdna_ensembl104--kallisto_v0.45.0,                         │
+│                                   │                                                            │ cdna_current--kallisto_v0.45.0,                            │
+│                                   │                                                            │ cdna_newest--kallisto_v0.45.0                              │
+│ homo_sapiens--GRCh38--spikes_ercc │ hisat2_index (hisat2_index, dir)                           │ genome--hisat2_v2.1.0                                      │
+└───────────────────────────────────┴────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
 ```
 
+Note that the spiked assemblies have all the same assets as the unspikes ones.
