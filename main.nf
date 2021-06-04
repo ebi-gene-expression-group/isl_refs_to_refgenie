@@ -428,7 +428,8 @@ process build_hisat_index {
         -a ${assembly} \
         -r hisat2_index \
         -d ${params.refgenieDir} \
-        -t ${additionalTags}--hisat2_v\${hisat2_version}\${rebuild}
+        -t ${additionalTags}--hisat2_v\${hisat2_version} \
+        -s \$genome_asset \${rebuild}
     """
 }
 
