@@ -76,11 +76,11 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
 
     if [ "$built" -eq 0 ]; then
         firsttag=$tag        
-        refgenieCommand="refgenie build --verbosity 5 $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
+        refgenieCommand="refgenie --verbosity 5 build $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
     else
         # See https://github.com/refgenie/refgenie/issues/252
         #refgenieCommand="refgenie tag $assembly/${recipe}:${firsttag} --tag $tag -c ${refgenieDir}/genome_config.yaml"
-        refgenieCommand="refgenie build --verbosity 5 $assembly/${recipe}:${tagPrefix}${tag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
+        refgenieCommand="refgenie --verbosity 5 build $assembly/${recipe}:${tagPrefix}${tag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
     fi            
 
     echo $refgenieCommand
