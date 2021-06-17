@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/homo_sapiens.conf" )
+IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf" )
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
@@ -43,7 +43,6 @@ process find_current_reference_files {
 
 CURRENT_REF_FILES
     .map{ r -> r*.text }
-    .filter{ it[0] == 'homo_sapiens' }
     .into{
         CURRENT_REF_FILES_FOR_NEWEST
         CURRENT_REF_FILES_FOR_DOWNSTREAM
