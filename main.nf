@@ -1,19 +1,21 @@
 #!/usr/bin/env nextflow
 
-IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf" )
+IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/homo_sapiens.conf" )
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
+SPIKES=SPIKES_GENOME.join(SPIKES_CDNA).join(SPIKES_GTF)
+
 SPIKES_CDNA_GTF = Channel.fromPath( "${baseDir}/spikes/*/*transcripts.gtf.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 GENOMES = Channel.fromPath( "${params.islGenomes}" ).splitText().map{r -> r.split()}.filter{ it.size() == 7 }.map{ r -> r*.toString() }
         
-ECOLI = Channel.of(['escherichia_coli', "${params.contamination.ecoli.assembly}", file("${params.contamination.ecoli.uri}")]).first()
-FUNGI = Channel.of(['fungi', "${params.contamination.fungi.assembly}", file("${params.contamination.fungi.uri}")]).first()
-VIRUSES = Channel.of(['viruses', "${params.contamination.viruses.assembly}", file("${params.contamination.viruses.uri}")]).first()
+ECOLI = Channel.of(['escherichia_coli', "${params.contamination.ecoli.assembly}", file("${params.contamination.ecoli.uri}"), 'default']).first()
+FUNGI = Channel.of(['fungi', "${params.contamination.fungi.assembly}", file("${params.contamination.fungi.uri}"), 'default']).first()
+VIRUSES = Channel.of(['viruses', "${params.contamination.viruses.assembly}", file("${params.contamination.viruses.uri}"), 'default']).first()
 
 // Get the species from the file- the name is not completely reliable
 
-process find_config_species {
+process find_current_reference_files {
 
     executor 'local'
 
@@ -21,239 +23,104 @@ process find_config_species {
         file(confFile) from IRAP_CONFIGS
 
     output:
-        tuple stdout, file(confFile) into IRAP_CONFIGS_BY_SPECIES
+        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') into CURRENT_REF_FILES
 
     """
-    grep "species=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'
-    """
-}
+    species=\$(grep "species=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n')
+    echo -n "\$species" > species.txt
+    fileRoot=${params.irapDataDir}/reference/\$species
 
-// Extract general info on references from the top-level ISL genome config and
-// combine with the current config
+    for field in reference cdna_file gtf_file; do
+        echo -n \${fileRoot}/\$(grep "\$field=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n') > \${field}.txt
+    done
+    detect_current_isl_genome_assembly.sh $confFile ${params.islGenomes} > assembly.txt
+    source=\$(grep "^\$(cat species.txt) " "${params.islGenomes}" | awk '{print \$3}') 
+    echo -n \$source\$(detect_current_isl_genome_release.sh $confFile) > release.txt
 
-GENOMES
-  .join(IRAP_CONFIGS_BY_SPECIES.unique())
-  .into{
-    MERGED_CONFIG_FOR_RELEASE
-    MERGED_CONFIG_FOR_ANNOTATE
-    MERGED_CONFIG_FOR_NEWEST_VERSION
-    MERGED_CONFIG_FOR_BUILDS
-  }
-
-// Find out what version (Ensembl release etc) we have)
-
-process find_curent_release {
-
-    executor 'local'
-
-    input:
-        tuple val(species), file(speciesConfig) from MERGED_CONFIG_FOR_RELEASE.map { r -> tuple(r[0], r[7])}
-
-    output:
-        tuple val(species), stdout into CURRENT_VERSIONS
-
-    """
-    detect_current_isl_genome_release.sh $speciesConfig
+    echo -n 'current' > tags.txt
     """
 }
 
-process find_newest_release {
-
-    executor 'local'
-
-    input:
-        tuple val(species), val(gtfPattern) from MERGED_CONFIG_FOR_NEWEST_VERSION.map{ r -> tuple(r[0], r[5]) }
-
-    output:
-        tuple val(species), stdout into NEWEST_VERSIONS
-
-    """
-    detect_newest_isl_genome_release.sh $species ${params.irapDataDir} $gtfPattern
-    """
-}
-
-MERGED_CONFIG_FOR_BUILDS
-  .map{r -> tuple(r[0].toString(), [ 'reference', 'cdna_file', 'gtf_file' ], r[6].toString().replaceAll('\\.', '_'), r[2].toString(),[ r[3].toString(), r[4].toString(), r[5].toString().trim() ])}
-  .join(CURRENT_VERSIONS)
-  .join(NEWEST_VERSIONS)
-  .transpose()
-  .into{
-    GENOME_INFO_FOR_REFERENCE
-    GENOME_INFO_FOR_CDNA
-    GENOME_INFO_FOR_GTF
-  }
-
-// Extract current reference info from the config files
- 
-process annotate_configline_with_species {
-    
-    executor 'local'
-
-    input:
-        tuple val(species), file(speciesConfig) from MERGED_CONFIG_FOR_ANNOTATE.map { r -> tuple(r[0], r[7])}
-
-    output:
-        file("${speciesConfig}.annotated") into ANNOTATED_CONFIGS
-
-    """
-    awk -v species=$species '{print species"="\$1}' ${speciesConfig} > ${speciesConfig}.annotated
-    """
-}
-
-ANNOTATED_CONFIGS
-    .splitText()
-    .map{r -> r.split('\\=') }
-    .filter{ it.length == 3 }
-    .map{r -> tuple(r[0].toString(), r[1].toString(), r[2].toString().trim())}
+CURRENT_REF_FILES
+    .map{ r -> r*.text }
+    .filter{ it[0] == 'homo_sapiens' }
     .into{
-        CURRENT_CONFIGS_FOR_GENOME
-        CURRENT_CONFIGS_FOR_CDNA
-        CURRENT_CONFIGS_FOR_GTF
+        CURRENT_REF_FILES_FOR_NEWEST
+        CURRENT_REF_FILES_FOR_DOWNSTREAM
     }
 
-// Find the current reference
-
-GENOME_INFO_FOR_REFERENCE
-    .filter{ it[1] == 'reference'}
-    .join(CURRENT_CONFIGS_FOR_GENOME, by: [0,1])
-    .map{r -> tuple(r[0], r[2], r[4], r[7])}
-    .set{
-        CURRENT_REFERENCE_INPUTS
-    }
-
-process find_current_reference {
+process find_newest_reference_files {
 
     executor 'local'
 
     input:
-        tuple val(species), val(assembly), val(pattern), val(currentFile) from CURRENT_REFERENCE_INPUTS
+        tuple val(species), val(taxId), val(source), val(genomePattern), val(cdnaPattern), val(gtfPattern), val(assembly) from GENOMES.join(CURRENT_REF_FILES_FOR_NEWEST.map{r -> tuple(r[0])})
 
     output:
-        tuple val(species), val(assembly), file('reference_filename.txt') into REFERENCE_CURRENT
-        
+        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') into NEWEST_REF_FILES
+         
     """
-    current_reference_path=${params.irapDataDir}/reference/${species}/$currentFile
-    if [ ! -e "\$current_reference_path" ]; then
-        echo "\$current_reference_path does not exist" 1>&2
-        exit 1
-    fi
-    echo -n "\$current_reference_path" > reference_filename.txt
-    """
-}
+    # Just making these files for consistency
+    echo -n "$species" > species.txt
+    echo -n "$assembly" > assembly.txt
 
-// Find the GTF and CDNA for the newest files ISL has
+    newestRelease=\$(detect_newest_isl_genome_release.sh $species ${params.irapDataDir} $gtfPattern)
+    echo -n "${source}\${newestRelease}" > release.txt
 
-GENOME_INFO_FOR_CDNA
-    .filter{ it[1] == 'cdna_file'}
-    .into{
-        GENOME_INFO_FOR_CDNA_NEWEST
-        GENOME_INFO_FOR_CDNA_CURRENT
-    }
+    fileRoot=${params.irapDataDir}/reference/$species
+    echo -n \${fileRoot}/\$(basename $genomePattern | sed "s/RELNO/\${newestRelease}/" | sed 's|primary_assembly|toplevel|') > reference.txt
+    echo -n \${fileRoot}/\$(basename $gtfPattern | sed "s/RELNO/\${newestRelease}/") > gtf_file.txt
 
-process find_newest_cdna {
-
-    executor 'local'
-
-    input:
-        tuple val(species), val(configType), val(assembly), val(source), val(pattern), val(currentRelease), val(newestRelease) from GENOME_INFO_FOR_CDNA_NEWEST
-
-    output:
-        tuple val(species),  val(assembly), file('version.txt'), file('cdna_filename.txt'), val('newest') optional true into CDNA_NEWEST  
-
-    """
-    versioned_cdna_fasta=${params.irapDataDir}/reference/$species/\$(basename $pattern | sed 's/.fa.gz/.${newestRelease}.fa.gz/')
-    if [ -e "\$versioned_cdna_fasta" ]; then
-        echo "cDNA with explicit version is available"
-        echo -n "\$versioned_cdna_fasta" > cdna_filename.txt
-        echo -en "${source}${newestRelease}" > version.txt
-    fi
-    """
-}
-
-GENOME_INFO_FOR_CDNA_CURRENT
-    .join(CURRENT_CONFIGS_FOR_CDNA, by: [0,1])
-    .set{
-        CURRENT_CDNA_INPUTS
-    }
-
-process find_current_cdna {
-
-    executor 'local'
-
-    input:
-        tuple val(species), val(configType), val(assembly), val(source), val(pattern), val(currentRelease), val(newestRelease), val(currentFile) from CURRENT_CDNA_INPUTS
-
-    output:
-        tuple val(species), val(assembly), file('version.txt'), file('cdna_filename.txt'), val('current') into CDNA_CURRENT
-        
-    """
-    current_cdna_path=${params.irapDataDir}/reference/${species}/$currentFile
-    if [ ! -e "\$current_cdna_path" ]; then
-        echo "\$current_cdna_path does not exist" 1>&2
-        exit 1
-    fi
-    echo -n "\$current_cdna_path" > cdna_filename.txt
-    echo -en "${source}${currentRelease}" > version.txt     
-    """
-}
-
-GENOME_INFO_FOR_GTF
-    .filter{ it[1] == 'gtf_file'}
-    .into{
-        GENOME_INFO_FOR_GTF_NEWEST
-        GENOME_INFO_FOR_GTF_CURRENT
-    }
-
-process find_newest_gtf {
-
-    executor 'local'
-
-    input:
-        tuple val(species), val(configType), val(assembly), val(source), val(pattern), val(currentRelease), val(newestRelease) from GENOME_INFO_FOR_GTF_NEWEST
-
-    output:
-        tuple val(species), val(assembly), file('version.txt'), file('gtf_filename.txt'), val('newest') into GTF_NEWEST  
-
-    """
-    newest_gtf=${params.irapDataDir}/reference/$species/\$(basename $pattern | sed 's/RELNO/${newestRelease}/')
-   
-    if [ ! -e \$newest_gtf ]; then
-        echo "\$newest_gtf file does not exist" 1>&2
-        exit 1
-    fi    
+    unversioned_cdna_fasta=\$(basename $cdnaPattern)
+    versioned_cdna_fasta=\$(echo -e "\$unversioned_cdna_fasta" | sed "s/.fa.gz/.\${newestRelease}.fa.gz/")
     
-    echo -n "\$newest_gtf" > gtf_filename.txt
-    echo -en "${source}${newestRelease}" > version.txt     
-    """
+    if [ -e "\${fileRoot}/\$versioned_cdna_fasta" ]; then
+        echo -n "\${fileRoot}/\$versioned_cdna_fasta" > cdna_file.txt
+    else
+        echo -n "\${fileRoot}/\$unversioned_cdna_fasta" > cdna_file.txt
+    fi
+
+    echo -n 'newest' > tags.txt
+    """ 
 }
 
-GENOME_INFO_FOR_GTF_CURRENT
-    .join(CURRENT_CONFIGS_FOR_GTF, by: [0,1])
+CURRENT_REF_FILES_FOR_DOWNSTREAM
+    .concat(NEWEST_REF_FILES.map{ r -> r*.text })
+    .map{tuple(it[0], it[1].replace('.', '_'), it[2], file(it[3]), file(it[4]), file(it[5]), it[6])}
     .set{
-        CURRENT_GTF_INPUTS
+        REF_FILES
+    } 
+
+REF_FILES
+    .into{
+        REF_FILES_FOR_SPIKES
+        REF_FILES_NOT_SPIKES
     }
 
-process find_current_gtf {
+process add_spikes {
 
     executor 'local'
 
     input:
-        tuple val(species), val(configType), val(assembly), val(source), val(pattern), val(currentRelease), val(newestRelease), val(currentFile) from CURRENT_GTF_INPUTS
+        tuple val(species), val(assembly), val(release), file(referenceFile), file(cdnaFile), file(gtfFile), val(tags), val(spikesName), val(spikesGenome), val(spikesCdna), val(spikesGtf) from REF_FILES_FOR_SPIKES.combine(SPIKES)
 
     output:
-        tuple val(species), val(assembly), file('version.txt'), file('gtf_filename.txt'), val('current') into GTF_CURRENT
-        
+        tuple val(species), val("${assembly}--spikes_${spikesName}"), val(release), file("${species}-${assembly}-${spikesName}.fa.gz"), file("${species}-${assembly}-${release}-${spikesName}.cdna.fa.gz"), file("${species}-${assembly}-${release}-${spikesName}.gtf.gz"), val(tags) into REF_FILES_WITH_SPIKES
+
     """
-    current_gtf_path=${params.irapDataDir}/reference/${species}/$currentFile
-    if [ ! -e "\$current_gtf_path" ]; then
-        echo "\$current_gtf_path does not exist" 1>&2
-        exit 1
-    fi
-    echo -n "\$current_gtf_path" > gtf_filename.txt
-    
-    echo -en "${source}${currentRelease}" > version.txt     
+    cat $referenceFile $spikesGenome > ${species}-${assembly}-${spikesName}.fa.gz
+    cat $cdnaFile $spikesCdna > ${species}-${assembly}-${release}-${spikesName}.cdna.fa.gz
+    cat $gtfFile $spikesGtf > ${species}-${assembly}-${release}-${spikesName}.gtf.gz
     """
 }
+
+REF_FILES_NOT_SPIKES
+    .concat(REF_FILES_WITH_SPIKES)
+    .into{
+        REF_FILES_FOR_GENOME
+        REF_FILES_FOR_POSTGENOME
+    }
+
 
 //// Build the base genome, with and without the genome spikes
 
@@ -262,15 +129,15 @@ process find_current_gtf {
 process make_contamination_fastas {
 
     input:
-        tuple val(ecoliSpecies), val(ecoliAssembly), file("ecoli.fa.gz") from ECOLI
-        tuple val(fungiSpecies), val(fungiAssembly), file("fungi.fa.gz") from FUNGI
-        tuple val(virusesSpecies), val(virusesAssembly), file("viruses.fa.gz") from VIRUSES
+        tuple val(ecoliSpecies), val(ecoliAssembly), file("ecoli.fa.gz"), val(tag) from ECOLI
+        tuple val(fungiSpecies), val(fungiAssembly), file("fungi.fa.gz"), val(tag) from FUNGI
+        tuple val(virusesSpecies), val(virusesAssembly), file("viruses.fa.gz"), val(tag) from VIRUSES
 
     output:
-        tuple val("${ecoliSpecies}-${fungiSpecies}"), val("${ecoliAssembly}-${fungiAssembly}"), file('ecoli_fungi.fa.gz') into ECOLI_FUNGI_CONTAMINATION_FASTA
-        tuple val("${fungiSpecies}-${virusesSpecies}"), val("${fungiAssembly}-${virusesAssembly}"), file('fungi_viral.fa.gz') into FUNGI_VIRUSES_CONTAMINATION_FASTA
-        tuple val("${ecoliSpecies}-${virusesSpecies}"), val("${ecoliAssembly}-${virusesAssembly}"), file('ecoli_viral.fa.gz') into ECOLI_VIRUSES_CONTAMINATION_FASTA
-        tuple val("${ecoliSpecies}-${fungiSpecies}-${virusesSpecies}"), val("${ecoliAssembly}-${fungiAssembly}-${virusesAssembly}"), file('ecoli_fungi_viral.fa.gz') into ECOLI_FUNGI_VIRUSES_CONTAMINATION_FASTA
+        tuple val("${ecoliSpecies}-${fungiSpecies}"), val("${ecoliAssembly}-${fungiAssembly}"), file('ecoli_fungi.fa.gz'), val('default') into ECOLI_FUNGI_CONTAMINATION_FASTA
+        tuple val("${fungiSpecies}-${virusesSpecies}"), val("${fungiAssembly}-${virusesAssembly}"), file('fungi_viral.fa.gz'), val('default') into FUNGI_VIRUSES_CONTAMINATION_FASTA
+        tuple val("${ecoliSpecies}-${virusesSpecies}"), val("${ecoliAssembly}-${virusesAssembly}"), file('ecoli_viral.fa.gz'), val('default') into ECOLI_VIRUSES_CONTAMINATION_FASTA
+        tuple val("${ecoliSpecies}-${fungiSpecies}-${virusesSpecies}"), val("${ecoliAssembly}-${fungiAssembly}-${virusesAssembly}"), file('ecoli_fungi_viral.fa.gz'), val('default') into ECOLI_FUNGI_VIRUSES_CONTAMINATION_FASTA
 
     """
     cat ecoli.fa.gz fungi.fa.gz > ecoli_fungi.fa.gz
@@ -287,30 +154,17 @@ ECOLI_FUNGI_CONTAMINATION_FASTA
         CONTAMINATION_GENOMES_FOR_BOWTIE2
     }
 
-REFERENCE_CURRENT
-    .map{ r -> tuple( r[0], r[1], file(r[2].text) ) }
+// Group references for the same assembly, e.g. from newest and current
+// reference sets so we only build it once. Provided the 'current' tag is
+// present this will be set as the default reference for the species.
+
+REF_FILES_FOR_GENOME
+    .groupTuple(by: [0,1])
+    .map{r -> tuple(r[0], r[1], r[3][0], r[6].unique().join(','))}
     .concat(ECOLI, FUNGI, VIRUSES)
     .concat(CONTAMINATION_GENOMES_FOR_BUILD)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1].replace('.', '_'), r[2], 'genome')}
-    .into{
-        REFERENCE_CURRENT_FOR_BUILD
-        REFERENCE_CURRENT_FOR_SPIKES
-    }
-
-process add_genome_spikes {
-    
-    executor 'local'
-    
-    input:
-        tuple val(species), val(assembly), file(filePath), val(additionalTags), val(spikesName), file(spikesFile) from REFERENCE_CURRENT_FOR_SPIKES.combine(SPIKES_GENOME)
-
-    output:
-        tuple val(species), val("${assembly}--spikes_${spikesName}"), file("${assembly}--${spikesName}.fa.gz"), val(additionalTags)  into REFERENCE_CURRENT_WITH_SPIKES   
- 
-    """
-    cat $filePath $spikesFile > ${assembly}--${spikesName}.fa.gz
-    """
-}
+    .map{tuple(it[0], it[1].replace('.', '_'), it[2], it[3])}
+    .set{GENOME_BUILD_INPUTS}
 
 process build_genome {
     
@@ -324,31 +178,36 @@ process build_genome {
     conda "${baseDir}/envs/refgenie.yml"
 
     input:
-        tuple val(species), val(assembly), file(filePath), val(additionalTags) from REFERENCE_CURRENT_FOR_BUILD.concat(REFERENCE_CURRENT_WITH_SPIKES)
+        tuple val(species), val(assembly), file(filePath), val(additionalTags) from GENOME_BUILD_INPUTS
 
     output:
-        tuple val(species), val(assembly), val(additionalTags), file(".done") into GENOME_REFERENCE
+        tuple val(species), val(assembly) into GENOME_REFERENCE
 
     """
     rebuild=''
     if [ "${task.attempt}" -gt 1 ]; then
         rebuild=' -b true'
     fi
+    
+    # If this is the current, un-spiked geneome for the species, then alias it
+    aliases=''
+    if [[ $assembly != *"spikes_"* ]] && [[ $additionalTags == *"current"* ]]; then
+        aliases=' -l $species'
+    fi
+    
     build_asset.sh \
-        -a $assembly \
+        -a ${species}--$assembly \
         -r fasta \
         -f fasta \
         -p $filePath \
         -d ${params.refgenieDir} \
-        -t ${additionalTags}\${rebuild} 
+        -t genome\${aliases}\${rebuild} 
     """
 }
 
 GENOME_REFERENCE
-    .map{r -> tuple(r[0], r[1], r[2])}
     .into{
-        GENOME_REFERENCE_FOR_GTF
-        GENOME_REFERENCE_FOR_CDNA
+        GENOME_REFERENCE_FOR_POSTGENOME
         GENOME_REFERENCE_FOR_HISAT
         GENOME_REFERENCE_FOR_BOWTIE2
     }
@@ -365,15 +224,14 @@ process build_hisat_index {
     maxRetries 10
 
     input:
-        tuple val(species), val(assembly), val(additionalTags) from GENOME_REFERENCE_FOR_HISAT
+        tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_HISAT
 
     output:
         tuple val(species), file(".done") into HISAT_DONE
 
     """
     hisat2_version=\$(cat ${baseDir}/envs/refgenie.yml | grep hisat2 | awk -F'=' '{print \$2}')
-    tags=${additionalTags}--hisat\${hisat2_version}
-    genome_asset="fasta=${assembly}/fasta:${additionalTags}"
+    genome_asset="fasta=${species}--${assembly}/fasta:genome"
     
     rebuild=''
     if [ "${task.attempt}" -gt 1 ]; then
@@ -381,10 +239,10 @@ process build_hisat_index {
     fi
 
     build_asset.sh \
-        -a ${assembly} \
+        -a ${species}--${assembly} \
         -r hisat2_index \
         -d ${params.refgenieDir} \
-        -t ${additionalTags}--hisat2_v\${hisat2_version} \
+        -t genome--hisat2_v\${hisat2_version} \
         -s \$genome_asset \${rebuild}
     """
 }
@@ -415,47 +273,23 @@ process build_bowtie2_index {
         rebuild=' -b true'
     fi
     build_asset.sh \
-        -a ${assembly} \
+        -a ${species}--${assembly} \
         -r bowtie2_index \
         -d ${params.refgenieDir} \
         -t v\${bowtie2_version}\${rebuild}
     """
 }
 
-// Build GTF for base genome, with and without spikes
-
-GTF_NEWEST
-    .concat(GTF_CURRENT)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1], r[2].text, file(r[3].text), r[4])}
-    .map{r -> tuple(r[0], r[1], r[2], r[3], r[2]+','+r[4]) }
-    .into{
-        GTF_FOR_BUILD
-        GTF_FOR_SPIKES
-    }
-    
-process add_genome_gtf_spikes {
-    
-    input:
-        tuple val(species), val(assembly), val(version), file(filePath), val(additionalTags), val(spikesName), file(spikesFile) from GTF_FOR_SPIKES.combine(SPIKES_GTF)
-
-    output:
-        tuple val(species), val("${assembly}--spikes_${spikesName}"), val(version), file("${assembly}_${version}--${spikesName}.gtf.gz"), val(additionalTags) into GTF_WITH_SPIKES   
- 
-    """
-    cat $filePath $spikesFile > ${assembly}_${version}--${spikesName}.gtf.gz
-    """
-}
 
 // The complex cross logic here is just to allow multiple GTFs per assembly
 // (which a join I used initially didn't allow).
 
-GENOME_REFERENCE_FOR_GTF
-    .map{ r -> tuple(r[0] + r[1])}
-    .cross( GTF_FOR_BUILD.concat(GTF_WITH_SPIKES).map{ r -> tuple(r[0] + r[1], r[0], r[1], r[2], r[3], r[4]) } )
-    .map{ r -> r[1] }
-    .map{ r -> tuple( r[1], r[2], r[3], r[4], r[5]) }
-    .set{
+GENOME_REFERENCE_FOR_POSTGENOME.map{r -> tuple(r[0] + r[1], r).flatten()}
+    .cross(REF_FILES_FOR_POSTGENOME.map{r -> tuple(r[0] + r[1], r).flatten()})
+    .map{it[1][1..-1]}
+    .into{
         GTF_BUILD_INPUTS
+        CDNA_BUILD_INPUTS
     }
 
 process build_annotation {
@@ -468,7 +302,7 @@ process build_annotation {
     conda "${baseDir}/envs/refgenie.yml"
 
     input:
-        tuple val(species), val(assembly), val(version), val(filePath), val(additionalTags) from GTF_BUILD_INPUTS
+        tuple val(species), val(assembly), val(version), val(filePath), val(additionalTags) from GTF_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}
 
     output:
         tuple val(species), file(".done") into ANNOTATION_DONE
@@ -479,47 +313,14 @@ process build_annotation {
         rebuild=' -b true'
     fi
     build_asset.sh \
-        -a $assembly \
+        -a ${species}--${assembly} \
         -r ensembl_gtf \
         -f ensembl_gtf  \
         -p $filePath \
         -d ${params.refgenieDir} \
-        -t ${additionalTags}\${rebuild}
+        -t ${version},${additionalTags}\${rebuild}
     """
 }
-
-// Note: for cDNAs we append the version to the genome assembly
-
-CDNA_NEWEST
-    .concat(CDNA_CURRENT)
-    .map{r -> tuple(r[0], r[0] + '--' + r[1], r[2].text, file(r[3].text), r[4])}
-    .map{r -> tuple(r[0], r[1], r[2], r[3], r[2]+','+r[4]) }
-    .into{
-        CDNA_FOR_BUILD
-        CDNA_FOR_SPIKES
-    }
-
-process add_cdna_spikes {
-    
-    input:
-        tuple val(species), val(assembly), val(version), file(filePath), val(additionalTags), val(spikesName), file(spikesFile) from CDNA_FOR_SPIKES.combine(SPIKES_CDNA)
-
-    output:
-        tuple val(species), val("${assembly}--spikes_${spikesName}"), val(version), file("${assembly}--${spikesName}.fa.gz"), val(additionalTags) into CDNA_WITH_SPIKES   
- 
-    """
-    cat $filePath $spikesFile > ${assembly}--${spikesName}.fa.gz
-    """
-}
-
-GENOME_REFERENCE_FOR_CDNA
-    .map{ r -> tuple(r[0].toString() + r[1])}
-    .cross( CDNA_FOR_BUILD.concat(CDNA_WITH_SPIKES).map{ r -> tuple(r[0] + r[1], r[0], r[1], r[2], r[3], r[4]) } )  
-    .map{ r -> r[1] }
-    .map{ r -> r[1..5] }
-    .set{
-        CDNA_BUILD_INPUTS
-    }
 
 process build_cdna {
  
@@ -531,10 +332,10 @@ process build_cdna {
     conda "${baseDir}/envs/refgenie.yml"
 
     input:
-        tuple val(species), val(assembly), val(version), file(filePath), val(additionalTags) from CDNA_BUILD_INPUTS
+        tuple val(species), val(assembly), val(version), file(filePath), val(additionalTags) from CDNA_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[4], r[6])}
 
     output:
-        tuple val(species), val("${assembly}"), val(version), val(additionalTags) into CDNA_REFERENCE
+        tuple val(species), val(assembly), val(version), val(additionalTags) into CDNA_REFERENCE
 
     """
     rebuild=''
@@ -542,12 +343,12 @@ process build_cdna {
         rebuild=' -b true'
     fi
     build_asset.sh \
-        -a ${assembly} \
+        -a ${species}--${assembly} \
         -r fasta_txome \
         -f fasta \
         -p $filePath \
         -d ${params.refgenieDir} \
-        -t ${additionalTags} \
+        -t ${version},${additionalTags} \
         -x cdna_ \${rebuild}
     """
 }
@@ -577,19 +378,18 @@ process build_salmon_index {
 
     """
     salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
-    cdna_asset="fasta=${assembly}/fasta_txome:cdna_\$(echo "${additionalTags}" | awk -F',' '{print \$1}')"
+    cdna_asset="fasta=${species}--${assembly}/fasta_txome:cdna_${version}"
     
     # Append the salmon version to all the input tags
-    tags=\$(for at in \$(echo ${additionalTags} | tr "," "\\n"); do
+    tags=\$(for at in \$(echo ${version} ${additionalTags} | tr "," "\\n"); do
         echo "\${at}--salmon_v\${salmon_version}"
     done | tr '\\n' ',' | sed 's/,\$//')  
-
     rebuild=''
     if [ "${task.attempt}" -gt 1 ]; then
         rebuild=' -b true'
     fi
     build_asset.sh \
-        -a ${assembly} \
+        -a ${species}--${assembly} \
         -r salmon_index \
         -d ${params.refgenieDir} \
         -t \$tags \
@@ -617,7 +417,7 @@ process build_kallisto_index {
 
     """
     kallisto_version=\$(cat ${baseDir}/envs/refgenie.yml | grep kallisto | awk -F'=' '{print \$2}')
-    cdna_asset="fasta=${assembly}/fasta_txome:cdna_\$(echo "${additionalTags}" | awk -F',' '{print \$1}')"
+    cdna_asset="fasta=${species}--${assembly}/fasta_txome:cdna_${version}"
     
     # Append the kallisto version to all the input tags
     tags=\$(for at in \$(echo ${additionalTags} | tr "," "\\n"); do
@@ -629,7 +429,7 @@ process build_kallisto_index {
         rebuild=' -b true'
     fi
     build_asset.sh \
-        -a ${assembly} \
+        -a ${species}--${assembly} \
         -r kallisto_index \
         -d ${params.refgenieDir} \
         -t \$tags \
@@ -637,4 +437,6 @@ process build_kallisto_index {
         -s \$cdna_asset \${rebuild}
     """
 }
+
+
 

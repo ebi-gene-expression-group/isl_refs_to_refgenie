@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
 configFile=$1
+islGenomesFile=$2
+
 config=$(cat $configFile)
 
-echo -e "$config" | grep "WBPS" > /dev/null
-isWBPS=$?
+species=$(echo -e "$configFile" | grep "species=" | awk -F'=' '{print $2}' | tr -d '\n')
+sourceResource=$(grep "^$species " $islGenomesFile | awk '{print $3}' | tr -d '\n')
 
-if [ "$isWBPS" -eq '0' ]; then
+if [ "$sourceResource" == 'wbps' ]; then
     version=$(echo -e "$config" | grep -Eo -m 1 "WBPS[0-9]+" | grep -Eo "[0-9]+")
 else 
     gtf_file=$(echo -e "$config" | grep gtf_file | awk -F '=' '{print $2}')
@@ -23,4 +25,4 @@ if [ -z "$version" ]; then
     exit 1
 fi
 
-echo -n $version
+echo -n ${sourceResource}${version}
