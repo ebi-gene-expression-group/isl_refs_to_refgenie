@@ -234,90 +234,6 @@ process reduce_genomes {
     """ 
 }
 
-process alias_genomes {
-
-    conda "${baseDir}/envs/refgenie.yml"
-    
-    input:
-        val(reduced) from REDUCED_REFERENCES
-        tuple val(species), val(assembly) from CURRENT_REF_FILES_FOR_ALIASING.map{tuple(it[0], it[1])}
-
-    output:
-         tuple val(species), val(assembly), val('none') into ALIAS_DONE
-
-    """
-    export REFGENIE=${params.refgenieDir}/genome_config.yaml
-    digest=\$(refgenie alias get -a ${species}--${assembly})
-    refgenie alias set --aliases $species --digest \$digest
-    if [ \$? -ne 0 ]; then
-        echo "Aliasing $assembly to $species failed" 1>&2
-        exit 1
-    fi
-    """
-}
-
-process build_hisat_index {
- 
-    conda "${baseDir}/envs/refgenie.yml"
-
-    memory { 20.GB * task.attempt }
-
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
-
-    input:
-        val(reduced) from REDUCED_REFERENCES
-        tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_HISAT
-
-    output:
-        tuple val(species), val(assembly), val('none') into HISAT2_DONE
-
-    """
-    hisat2_version=\$(cat ${baseDir}/envs/refgenie.yml | grep hisat2 | awk -F'=' '{print \$2}')
-    genome_asset="fasta=${species}--${assembly}/fasta:genome"
-    
-    build_asset.sh \
-        -a ${species}--${assembly} \
-        -r hisat2_index \
-        -d ${params.refgenieDir} \
-        -t genome--hisat2_v\${hisat2_version} \
-        -m yes \
-        -b true \
-        -s \$genome_asset
-    """
-}
-
-// Build bowtie2 indices for contamination genomes specifically
-
-process build_bowtie2_index {
- 
-    conda "${baseDir}/envs/refgenie.yml"
-
-    memory { 20.GB * task.attempt }
-
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
-
-    input:
-        val(reduced) from REDUCED_REFERENCES
-        tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_BOWTIE2.join(CONTAMINATION_GENOMES_FOR_BOWTIE2).map{ r -> tuple(r[0], r[1]) }
-
-    output:
-        tuple val(species), val(assembly), val('none') into BOWTIE2_DONE
-
-    """
-    bowtie2_version=\$(cat ${baseDir}/envs/refgenie.yml | grep bowtie2 | awk -F'=' '{print \$2}')
-    build_asset.sh \
-        -a ${species}--${assembly} \
-        -r bowtie2_index \
-        -d ${params.refgenieDir} \
-        -m yes \
-        -b true \
-        -t v\${bowtie2_version}
-    """
-}
-
-
 // The complex cross logic here is just to allow multiple GTFs per assembly
 // (which a join I used initially didn't allow).
 
@@ -353,6 +269,28 @@ process build_annotation {
         -m yes \
         -b true \
         -t ${version},${additionalTags}
+    """
+}
+
+process alias_genomes {
+
+    conda "${baseDir}/envs/refgenie.yml"
+    
+    input:
+        val(reduced) from REDUCED_REFERENCES
+        tuple val(species), val(assembly) from CURRENT_REF_FILES_FOR_ALIASING.map{tuple(it[0], it[1])}
+
+    output:
+         tuple val(species), val(assembly), val('none') into ALIAS_DONE
+
+    """
+    export REFGENIE=${params.refgenieDir}/genome_config.yaml
+    digest=\$(refgenie alias get -a ${species}--${assembly})
+    refgenie alias set --aliases $species --digest \$digest
+    if [ \$? -ne 0 ]; then
+        echo "Aliasing $assembly to $species failed" 1>&2
+        exit 1
+    fi
     """
 }
 
@@ -397,6 +335,8 @@ CDNA_REFERENCE
 // right time
 
 CDNA_REFERENCE_FOR_COLLECTION
+    .concat(ANNOTATION_DONE)
+    .concat(ALIAS_DONE)
     .collect()
     .map { r -> 'collected' }
     .set{
@@ -420,6 +360,74 @@ process reduce_cdnas {
     """
     refgenie build --reduce -c ${params.refgenieDir}/genome_config.yaml
     """ 
+}
+
+// In the below, we make everything dependent on the completion of the
+// annotation and cDNA builds. This is not because of a functional dependency,
+// rather because we can't run 'map' operations alongside 'reduce' operations.
+// So we do all the (fairly quick) fasta, gtf and alias building first so we
+// can release them for use ASAP, then run the other slow indexing in parallel
+// without worrying.
+
+process build_hisat_index {
+ 
+    conda "${baseDir}/envs/refgenie.yml"
+
+    memory { 20.GB * task.attempt }
+
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
+    maxRetries 10
+
+    input:
+        val(reduced) from REDUCED_CDNAS
+        tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_HISAT
+
+    output:
+        tuple val(species), val(assembly), val('none') into HISAT2_DONE
+
+    """
+    hisat2_version=\$(cat ${baseDir}/envs/refgenie.yml | grep hisat2 | awk -F'=' '{print \$2}')
+    genome_asset="fasta=${species}--${assembly}/fasta:genome"
+    
+    build_asset.sh \
+        -a ${species}--${assembly} \
+        -r hisat2_index \
+        -d ${params.refgenieDir} \
+        -t genome--hisat2_v\${hisat2_version} \
+        -m yes \
+        -b true \
+        -s \$genome_asset
+    """
+}
+
+// Build bowtie2 indices for contamination genomes specifically
+
+process build_bowtie2_index {
+ 
+    conda "${baseDir}/envs/refgenie.yml"
+
+    memory { 20.GB * task.attempt }
+
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
+    maxRetries 10
+
+    input:
+        val(reduced) from REDUCED_CDNAS
+        tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_BOWTIE2.join(CONTAMINATION_GENOMES_FOR_BOWTIE2).map{ r -> tuple(r[0], r[1]) }
+
+    output:
+        tuple val(species), val(assembly), val('none') into BOWTIE2_DONE
+
+    """
+    bowtie2_version=\$(cat ${baseDir}/envs/refgenie.yml | grep bowtie2 | awk -F'=' '{print \$2}')
+    build_asset.sh \
+        -a ${species}--${assembly} \
+        -r bowtie2_index \
+        -d ${params.refgenieDir} \
+        -m yes \
+        -b true \
+        -t v\${bowtie2_version}
+    """
 }
 
 process build_salmon_index {
@@ -491,16 +499,21 @@ process build_kallisto_index {
         -x 'cdna_' \
         -m yes \
         -b true \
-        -s \$cdna_asset \${rebuild}
+        -s \$cdna_asset
     """
 }
 
 // Collect species-wise outputs and run the refgenie reduce 
+// Note: we'd like to be able to run a reduce once we have all the assets for
+// each species. But since we can't run reduce operations while maps are
+// ongoing, we need to wait until everything is done (hence the collect(). If
+// that restriction is removed by the refgeneie bods, we can fix this.
 
 HISAT2_DONE.map{tuple(it[0], it[1])}
-    .join(ANNOTATION_DONE.map{tuple(it[0], it[1])})
     .join(SALMON_DONE.groupTuple(by: [0,1]).map{tuple(it[0], it[1])})
     .join(KALLISTO_DONE.groupTuple(by: [0,1]).map{tuple(it[0], it[1])})
+    .collect() 
+    .map{ tuple('all', 'all', 'all')}
     .set{
         SPECIES_REDUCTIONS
     }
