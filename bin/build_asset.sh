@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-usage() { echo "Usage: $0 [ -a <assembly> ] [ -r <recipe> ] [ -f <file type> ] [ -p <file path> ] [ -d <refgenie directory> ] [ -t <comma-separated tags> ] [ -x <tag prefix> ] [ -s <assets> ] [ -l <aliases>] [ -b <force rebuild?> ]" 1>&2; }
+usage() { echo "Usage: $0 [ -a <assembly> ] [ -r <recipe> ] [ -f <file type> ] [ -p <file path> ] [ -d <refgenie directory> ] [ -t <comma-separated tags> ] [ -x <tag prefix> ] [ -s <assets> ] [ -l <aliases>] [ -b <force rebuild?> ] [ -m <map only> ]" 1>&2; }
 
 assembly=
 recipe=
@@ -12,8 +12,9 @@ tagPrefix=
 assets=
 forceRebuild=
 aliases=
+mapOnly=
 
-while getopts ":a:r:f:p:d:t:x:s:l:b:" o; do
+while getopts ":a:r:f:p:d:t:x:s:l:b:m:" o; do
     case "${o}" in
         a)
             assembly=${OPTARG}
@@ -45,6 +46,9 @@ while getopts ":a:r:f:p:d:t:x:s:l:b:" o; do
         b)
             forceRebuild=${OPTARG}
             ;;
+        m)
+            mapOnly=" --map"
+            ;;
         *)
             usage
             exit 1
@@ -61,9 +65,9 @@ if [ -n "$fileType" ]; then
 elif [ -n "$assets" ]; then
     assetsPart="--assets $assets "
 fi
-#if [ -n "$forceRebuild" ]; then
-    #rebuildPart=' -R '
-#fi
+if [ -n "$forceRebuild" ]; then
+    rebuildPart=' -R '
+fi
 
 built=0
 firsttag=
@@ -82,11 +86,11 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
 
     if [ "$built" -eq 0 ]; then
         firsttag=$tag        
-        refgenieCommand="refgenie --verbosity 5 build $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
+        refgenieCommand="refgenie --verbosity 5 build $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}${mapOnly}"
     else
         # See https://github.com/refgenie/refgenie/issues/252
         #refgenieCommand="refgenie tag $assembly/${recipe}:${firsttag} --tag $tag -c ${refgenieDir}/genome_config.yaml"
-        refgenieCommand="refgenie --verbosity 5 build $assembly/${recipe}:${tagPrefix}${tag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}"
+        refgenieCommand="refgenie --verbosity 5 build $assembly/${recipe}:${tagPrefix}${tag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}${mapOnly}"
     fi            
 
     echo $refgenieCommand
@@ -96,7 +100,7 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
 	    echo "Refgenie build returned non-zero exit status" 1>&2
 	    exit 1
     else
-        if [ -e "$completedFlag" ]; then
+#        if [ -e "$completedFlag" ]; then
             echo "Refgenie build process successful"
 
             # If this is a genome build, set any provided aliases
@@ -110,10 +114,10 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
                 fi
             fi
             built=1
-        else
-            echo "Refgenie build process failed, '$completedFlag' not present" 1>&2
-            exit 1
-        fi
+ #       else
+ #           echo "Refgenie build process failed, '$completedFlag' not present" 1>&2
+ #           exit 1
+ #       fi
     fi
 
 done
