@@ -5,7 +5,7 @@ islGenomesFile=$2
 
 config=$(cat $configFile)
 
-species=$(echo -e "$configFile" | grep "species=" | awk -F'=' '{print $2}' | tr -d '\n')
+species=$(echo -e "$config" | grep "species=" | awk -F'=' '{print $2}' | tr -d '\n')
 sourceResource=$(grep "^$species " $islGenomesFile | awk '{print $3}' | tr -d '\n')
 
 if [ "$sourceResource" == 'wbps' ]; then

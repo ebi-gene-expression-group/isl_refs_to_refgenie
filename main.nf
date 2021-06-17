@@ -19,6 +19,8 @@ process find_current_reference_files {
 
     executor 'local'
 
+    errorStrategy 'finish'
+
     input: 
         file(confFile) from IRAP_CONFIGS
 
@@ -31,11 +33,11 @@ process find_current_reference_files {
     fileRoot=${params.irapDataDir}/reference/\$species
 
     for field in reference cdna_file gtf_file; do
-        echo -n \${fileRoot}/\$(grep "\$field=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n') > \${field}.txt
+        echo -n \${fileRoot}/\$(grep "^\$field=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n') > \${field}.txt
     done
     detect_current_isl_genome_assembly.sh $confFile ${params.islGenomes} > assembly.txt
     source=\$(grep "^\$(cat species.txt) " "${params.islGenomes}" | awk '{print \$3}') 
-    echo -n \$source\$(detect_current_isl_genome_release.sh $confFile) > release.txt
+    echo -n \$(detect_current_isl_genome_release.sh $confFile "${params.islGenomes}") > release.txt
 
     echo -n 'current' > tags.txt
     """
@@ -52,6 +54,7 @@ CURRENT_REF_FILES
 process find_newest_reference_files {
 
     executor 'local'
+    errorStrategy 'finish'
 
     input:
         tuple val(species), val(taxId), val(source), val(genomePattern), val(cdnaPattern), val(gtfPattern), val(assembly) from GENOMES.join(CURRENT_REF_FILES_FOR_NEWEST.map{r -> tuple(r[0])})
@@ -71,7 +74,7 @@ process find_newest_reference_files {
     echo -n \${fileRoot}/\$(basename $genomePattern | sed "s/RELNO/\${newestRelease}/" | sed 's|primary_assembly|toplevel|') > reference.txt
     echo -n \${fileRoot}/\$(basename $gtfPattern | sed "s/RELNO/\${newestRelease}/") > gtf_file.txt
 
-    unversioned_cdna_fasta=\$(basename $cdnaPattern)
+    unversioned_cdna_fasta=\$(basename $cdnaPattern |  sed "s/RELNO/\${newestRelease}/")
     versioned_cdna_fasta=\$(echo -e "\$unversioned_cdna_fasta" | sed "s/.fa.gz/.\${newestRelease}.fa.gz/")
     
     if [ -e "\${fileRoot}/\$versioned_cdna_fasta" ]; then
@@ -85,6 +88,7 @@ process find_newest_reference_files {
 }
 
 CURRENT_REF_FILES_FOR_DOWNSTREAM
+    .view()
     .concat(NEWEST_REF_FILES.map{ r -> r*.text })
     .map{tuple(it[0], it[1].replace('.', '_'), it[2], file(it[3]), file(it[4]), file(it[5]), it[6])}
     .set{
@@ -100,6 +104,7 @@ REF_FILES
 process add_spikes {
 
     executor 'local'
+    errorStrategy 'finish'
 
     input:
         tuple val(species), val(assembly), val(release), file(referenceFile), file(cdnaFile), file(gtfFile), val(tags), val(spikesName), val(spikesGenome), val(spikesCdna), val(spikesGtf) from REF_FILES_FOR_SPIKES.combine(SPIKES)
@@ -128,6 +133,7 @@ REF_FILES_NOT_SPIKES
 
 process make_contamination_fastas {
 
+    errorStrategy 'finish'
     input:
         tuple val(ecoliSpecies), val(ecoliAssembly), file("ecoli.fa.gz"), val(tag) from ECOLI
         tuple val(fungiSpecies), val(fungiAssembly), file("fungi.fa.gz"), val(tag) from FUNGI
@@ -208,6 +214,7 @@ GENOME_REFERENCE
 // right time
 
 GENOME_REFERENCE_FOR_COLLECTION
+    .view()
     .collect()
     .map { r -> 'collected' }
     .set{
@@ -217,6 +224,7 @@ GENOME_REFERENCE_FOR_COLLECTION
 process reduce_genomes {
 
     conda "${baseDir}/envs/refgenie.yml"
+    errorStrategy 'finish'
     
     memory { 20.GB * task.attempt }
     
@@ -274,6 +282,7 @@ process build_annotation {
 process alias_genomes {
 
     conda "${baseDir}/envs/refgenie.yml"
+    errorStrategy 'finish'
     
     input:
         val(reduced) from REDUCED_REFERENCES
@@ -345,6 +354,7 @@ CDNA_REFERENCE_FOR_COLLECTION
 process reduce_cdnas {
 
     conda "${baseDir}/envs/refgenie.yml"
+    errorStrategy 'finish'
     
     memory { 20.GB * task.attempt }
     
