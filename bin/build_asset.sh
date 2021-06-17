@@ -94,30 +94,32 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
     fi            
 
     echo $refgenieCommand
-    eval $refgenieCommand
-  
-    if [ $? -ne 0 ]; then
+
+    # Check for errors in case the return code isn't useful
+
+    eval $refgenieCommand > cmd.out
+    statusCode=$?
+    grep "Changed status from running to failed" cmd.out > /dev/null
+    errorPresent=$? 
+    cat cmd.out && rm cmd.out
+
+    if [ $? -ne 0 ] || [ $errorPresent -eq 0 ]; then
 	    echo "Refgenie build returned non-zero exit status" 1>&2
 	    exit 1
     else
-#        if [ -e "$completedFlag" ]; then
-            echo "Refgenie build process successful"
+        echo "Refgenie build process successful"
 
-            # If this is a genome build, set any provided aliases
+        # If this is a genome build, set any provided aliases
 
-            if [ "$built" -eq 0 ] && [ "$recipe" = 'fasta' ] && [ -n "$aliases" ]; then
-                digest=$(refgenie alias get -a $assembly)
-                refgenie alias set --aliases $(echo -e "$aliases" | sed 's/,/ /g') --digest $digest
-                if [ $? -ne 0 ]; then
-                    echo "Aliasing $assembly to $aliases failed" 1>&2
-                    exit 1
-                fi
+        if [ "$built" -eq 0 ] && [ "$recipe" = 'fasta' ] && [ -n "$aliases" ]; then
+            digest=$(refgenie alias get -a $assembly)
+            refgenie alias set --aliases $(echo -e "$aliases" | sed 's/,/ /g') --digest $digest
+            if [ $? -ne 0 ]; then
+                echo "Aliasing $assembly to $aliases failed" 1>&2
+                exit 1
             fi
-            built=1
- #       else
- #           echo "Refgenie build process failed, '$completedFlag' not present" 1>&2
- #           exit 1
- #       fi
+        fi
+        built=1
     fi
 
 done
