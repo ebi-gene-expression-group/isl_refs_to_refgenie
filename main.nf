@@ -318,7 +318,6 @@ CDNA_REFERENCE
 // right time
 
 CDNA_REFERENCE_FOR_COLLECTION
-    .concat(ANNOTATION_DONE)
     .collect()
     .map { r -> 'collected' }
     .set{
