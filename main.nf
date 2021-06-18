@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf" )
+IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
@@ -88,7 +88,6 @@ process find_newest_reference_files {
 }
 
 CURRENT_REF_FILES_FOR_DOWNSTREAM
-    .view()
     .concat(NEWEST_REF_FILES.map{ r -> r*.text })
     .map{tuple(it[0], it[1].replace('.', '_'), it[2], file(it[3]), file(it[4]), file(it[5]), it[6])}
     .set{
@@ -175,9 +174,9 @@ REF_FILES_FOR_GENOME
 process build_genome {
     
     memory { 2.GB * task.attempt }
-    
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
+
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
  
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -214,7 +213,6 @@ GENOME_REFERENCE
 // right time
 
 GENOME_REFERENCE_FOR_COLLECTION
-    .view()
     .collect()
     .map { r -> 'collected' }
     .set{
@@ -279,29 +277,6 @@ process build_annotation {
     """
 }
 
-process alias_genomes {
-
-    conda "${baseDir}/envs/refgenie.yml"
-    errorStrategy 'finish'
-    
-    input:
-        val(reduced) from REDUCED_REFERENCES
-        tuple val(species), val(assembly) from CURRENT_REF_FILES_FOR_ALIASING.map{tuple(it[0], it[1])}
-
-    output:
-         tuple val(species), val(assembly), val('none') into ALIAS_DONE
-
-    """
-    export REFGENIE=${params.refgenieDir}/genome_config.yaml
-    digest=\$(refgenie alias get -a ${species}--${assembly})
-    refgenie alias set --aliases $species --digest \$digest
-    if [ \$? -ne 0 ]; then
-        echo "Aliasing $assembly to $species failed" 1>&2
-        exit 1
-    fi
-    """
-}
-
 process build_cdna {
  
     errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
@@ -344,7 +319,6 @@ CDNA_REFERENCE
 
 CDNA_REFERENCE_FOR_COLLECTION
     .concat(ANNOTATION_DONE)
-    .concat(ALIAS_DONE)
     .collect()
     .map { r -> 'collected' }
     .set{
@@ -388,7 +362,7 @@ process build_hisat_index {
     maxRetries 10
 
     input:
-        val(reduced) from REDUCED_CDNAS
+        val(reduced) from REDUCED_REFERENCES
         tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_HISAT
 
     output:
@@ -421,7 +395,7 @@ process build_bowtie2_index {
     maxRetries 10
 
     input:
-        val(reduced) from REDUCED_CDNAS
+        val(reduced) from REDUCED_REFERENCES
         tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_BOWTIE2.join(CONTAMINATION_GENOMES_FOR_BOWTIE2).map{ r -> tuple(r[0], r[1]) }
 
     output:
@@ -518,11 +492,10 @@ process build_kallisto_index {
 // ongoing, we need to wait until everything is done (hence the collect(). If
 // that restriction is removed by the refgeneie bods, we can fix this.
 
-HISAT2_DONE.map{tuple(it[0], it[1])}
-    .join(SALMON_DONE.groupTuple(by: [0,1]).map{tuple(it[0], it[1])})
-    .join(KALLISTO_DONE.groupTuple(by: [0,1]).map{tuple(it[0], it[1])})
-    .collect() 
-    .map{ tuple('all', 'all', 'all')}
+HISAT2_DONE.groupTuple()
+    .join(SALMON_DONE.groupTuple())
+    .join(KALLISTO_DONE.groupTuple())
+    .map{it[0]}
     .set{
         SPECIES_REDUCTIONS
     }
@@ -536,10 +509,40 @@ process reduce {
     maxForks 1
     
     input:
-        tuple val(species), val(assembly), val(versions) from SPECIES_REDUCTIONS
+        val(species) from SPECIES_REDUCTIONS
+
+    output:
+        val(species) into REDUCED_SPECIES
 
     """
     refgenie build --reduce -c ${params.refgenieDir}/genome_config.yaml
     """ 
+}
+
+// By making aliasing dependent on the output of the reduction of indices we
+// can use aliasing as a marker of completion for a species
+
+process alias_genomes {
+
+    conda "${baseDir}/envs/refgenie.yml"
+    errorStrategy 'finish'
+    
+    maxForks 1
+    
+    input:
+        tuple val(species), val(assembly) from CURRENT_REF_FILES_FOR_ALIASING.map{tuple(it[0], it[1])}.join(REDUCED_SPECIES)
+
+    output:
+         tuple val(species), val(assembly), val('none') into ALIAS_DONE
+
+    """
+    export REFGENIE=${params.refgenieDir}/genome_config.yaml
+    digest=\$(refgenie alias get -a ${species}--${assembly})
+    refgenie alias set --aliases $species --digest \$digest
+    if [ \$? -ne 0 ]; then
+        echo "Aliasing $assembly to $species failed" 1>&2
+        exit 1
+    fi
+    """
 }
 
