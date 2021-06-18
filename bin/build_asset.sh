@@ -79,7 +79,7 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
 
     refgenie seek ${assembly}/${recipe}:${tag} > /dev/null 2>&1
 
-    if [ $? -eq 0 ]; then
+    if [ $? -eq 0 ] && [ -z  "$forceRebuild" ]; then
         echo "Asset ${assembly}/${recipe}:${tag} already present"
         continue
     fi
