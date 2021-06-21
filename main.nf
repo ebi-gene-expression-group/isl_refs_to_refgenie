@@ -252,8 +252,8 @@ GENOME_REFERENCE_FOR_POSTGENOME.map{r -> tuple(r[0] + r[1], r).flatten()}
 
 process build_annotation {
     
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
     
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -279,8 +279,8 @@ process build_annotation {
 
 process build_cdna {
  
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
     
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -357,8 +357,8 @@ process build_hisat_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
 
     input:
         val(reduced) from REDUCED_REFERENCES
@@ -390,8 +390,8 @@ process build_bowtie2_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
 
     input:
         val(reduced) from REDUCED_REFERENCES
@@ -418,8 +418,8 @@ process build_salmon_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
 
     input:
         val(reduced) from REDUCED_CDNAS
@@ -454,8 +454,8 @@ process build_kallisto_index {
 
     memory { 20.GB * task.attempt }
 
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 10  ? 'retry': 'ignore' }
-    maxRetries 10
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
 
     input:
         val(reduced) from REDUCED_CDNAS
@@ -494,7 +494,8 @@ process build_kallisto_index {
 HISAT2_DONE.groupTuple()
     .join(SALMON_DONE.groupTuple())
     .join(KALLISTO_DONE.groupTuple())
-    .map{it[0]}
+    .collect()
+    .map { r -> 'collected' }
     .set{
         SPECIES_REDUCTIONS
     }
@@ -508,10 +509,10 @@ process reduce {
     maxForks 1
     
     input:
-        val(species) from SPECIES_REDUCTIONS
+        val(collected) from SPECIES_REDUCTIONS
 
     output:
-        val(species) into REDUCED_SPECIES
+        val('reduced') into REDUCED_SPECIES
 
     """
     refgenie build --reduce -c ${params.refgenieDir}/genome_config.yaml
@@ -524,12 +525,13 @@ process reduce {
 process alias_genomes {
 
     conda "${baseDir}/envs/refgenie.yml"
-    errorStrategy 'finish'
+    errorStrategy 'ignore'
     
     maxForks 1
     
     input:
-        tuple val(species), val(assembly) from CURRENT_REF_FILES_FOR_ALIASING.map{tuple(it[0], it[1])}.join(REDUCED_SPECIES)
+        val('reduced') from REDUCED_SPECIES
+        tuple val(species), val(assembly) from CURRENT_REF_FILES_FOR_ALIASING.map{tuple(it[0], it[1])}
 
     output:
          tuple val(species), val(assembly), val('none') into ALIAS_DONE
