@@ -8,7 +8,7 @@ assemblies_list=$( echo -e "$list" | sed 's/^â”‚ //g' | grep '^[a-z]' | awk -F'â
 
 for spec in $species; do
     for spikeset in '' '--spikes_ercc'; do
-        echo -e "${spec}-${$spikeset}"
+        echo -e "${spec}-${spikeset}"
         needed_aliases=''
         for alias in newest current; do
             echo -e "$list" | grep "${spec}--${alias}${spikeset}" > /dev/null
