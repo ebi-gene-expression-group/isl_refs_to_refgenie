@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+export COLUMNS=500
+
 # Alias genomes so they can be identified without knowing assemblies
 
 list=$(refgenie list)
@@ -8,7 +10,7 @@ assemblies_list=$( echo -e "$list" | sed 's/^â”‚ //g' | grep '^[a-z]' | awk -F'â
 
 for spec in $species; do
     for spikeset in '' '--spikes_ercc'; do
-        echo -e "${spec}-${spikeset}"
+        echo -e "## Species: ${spec}${spikeset}"
         needed_aliases=''
         for alias in newest current; do
             echo -e "$list" | grep "${spec}--${alias}${spikeset}" > /dev/null
@@ -41,6 +43,7 @@ for spec in $species; do
                     if [ $? -eq 0 ]; then
                         echo "Aliasing $can_gen as ${spec}--${na}${spikeset} using digest $digest"
                         refgenie alias set --aliases ${spec}--${na}${spikeset} --digest $digest
+                        needed_aliases=$(echo $needed_aliases | sed "s/$na//")
                     fi
                 done
             done
