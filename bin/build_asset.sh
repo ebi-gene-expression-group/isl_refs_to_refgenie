@@ -72,7 +72,14 @@ fi
 built=0
 firsttag=
 
-export REFGENIE=${refgenieDir}/genome_config.yaml 
+if [ -n "$refenieDir" ]; then
+    export REFGENIE=${refgenieDir}/genome_config.yaml 
+elif [ -n "$REFGENIE" ]; then
+    refgenieDir=$(dirname $REFGENIE)
+else
+    echo "Need to set env var REFGENIE or supply Refgenie directory via -d" 1>&2
+    exit 1
+fi
 
 for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
     completedFlag="${refgenieDir}/alias/$assembly/$recipe/${tagPrefix}$tag/_refgenie_build/refgenie_completed.flag"
