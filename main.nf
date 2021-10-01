@@ -25,21 +25,29 @@ process find_current_reference_files {
         file(confFile) from IRAP_CONFIGS
 
     output:
-        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') into CURRENT_REF_FILES
+        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') optional true into CURRENT_REF_FILES
 
     """
     species=\$(grep "species=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n')
-    echo -n "\$species" > species.txt
+    assembly=\$( detect_current_isl_genome_assembly.sh $confFile ${params.islGenomes})
+    release=\$(detect_current_isl_genome_release.sh $confFile "${params.islGenomes}")
     fileRoot=${params.irapDataDir}/reference/\$species
+    reference=\$echo -n \${fileRoot}/\$(grep "^reference=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
+    cdna_file=\$echo -n \${fileRoot}/\$(grep "^cdna_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
+    gtf_file=\$echo -n \${fileRoot}/\$(grep "^gtf_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
 
-    for field in reference cdna_file gtf_file; do
-        echo -n \${fileRoot}/\$(grep "^\$field=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n') > \${field}.txt
-    done
-    detect_current_isl_genome_assembly.sh $confFile ${params.islGenomes} > assembly.txt
-    source=\$(grep "^\$(cat species.txt) " "${params.islGenomes}" | awk '{print \$3}') 
-    echo -n \$(detect_current_isl_genome_release.sh $confFile "${params.islGenomes}") > release.txt
+    check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "current"
 
-    echo -n 'current' > tags.txt
+    if [ $? -eq 0 ]; then
+        echo -n "\$species" > species.txt
+        echo -n "\$assembly" > assembly.txt
+        echo -n "\$release" > release.txt
+        echo -n "\$reference" > reference.txt
+        echo -n "\$cdna_file" > cdna_file.txt
+        echo -n "\$gtf_file" > gtf_file.txt
+        echo -n "current" > tags.txt
+        
+    fi
     """
 }
 
