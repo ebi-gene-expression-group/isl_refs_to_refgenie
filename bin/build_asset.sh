@@ -91,13 +91,15 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
         continue
     fi
 
+    echo "Building assets"
+
     if [ "$built" -eq 0 ]; then
         firsttag=$tag        
-        refgenieCommand="refgenie --verbosity 5 build $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}${mapOnly}"
+        refgenieCommand="refgenie build $assembly/${recipe}:${tagPrefix}${firsttag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}${mapOnly}"
     else
         # See https://github.com/refgenie/refgenie/issues/252
         #refgenieCommand="refgenie tag $assembly/${recipe}:${firsttag} --tag $tag -c ${refgenieDir}/genome_config.yaml"
-        refgenieCommand="refgenie --verbosity 5 build $assembly/${recipe}:${tagPrefix}${tag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}${mapOnly}"
+        refgenieCommand="refgenie build $assembly/${recipe}:${tagPrefix}${tag} ${filePart}${assetsPart}-c ${refgenieDir}/genome_config.yaml${rebuildPart}${mapOnly}"
     fi            
 
     echo $refgenieCommand
@@ -107,11 +109,14 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
     eval $refgenieCommand > cmd.out
     statusCode=$?
     grep "Changed status from running to failed" cmd.out > /dev/null
-    errorPresent=$? 
+    errorPresent=$?
+    grep "Finished building" cmd.out > /dev/null
+    finishedBuilding=$?
+ 
     cat cmd.out && rm cmd.out
 
-    if [ $? -ne 0 ] || [ $errorPresent -eq 0 ]; then
-	    echo "Refgenie build returned non-zero exit status" 1>&2
+    if [ $statusCode -ne 0 ] || [ $errorPresent -eq 0 ] || [ $finishedBuilding -ne 0 ]; then
+	    echo "Refgenie build returned non-zero exit status or logs indicate failure" 1>&2
 	    exit 1
     else
         echo "Refgenie build process successful"
@@ -119,12 +124,25 @@ for tag in $(echo "$tags" | tr -d '\n' | sed 's/,/ /g'); do
         # If this is a genome build, set any provided aliases
 
         if [ "$built" -eq 0 ] && [ "$recipe" = 'fasta' ] && [ -n "$aliases" ]; then
+           
+            echo "Setting aliases"
+
+            # Remove pre-existing aliases (Refgenie doesn't seem to overwrite them)
+ 
             digest=$(refgenie alias get -a $assembly)
-            refgenie alias set --aliases $(echo -e "$aliases" | sed 's/,/ /g') --digest $digest
-            if [ $? -ne 0 ]; then
-                echo "Aliasing $assembly to $aliases failed" 1>&2
-                exit 1
-            fi
+            
+            for alias in $(echo -e "$aliases" | sed 's/,/ /g'); do
+                existing_alias_digest=$(refgenie alias get -a $alias 2>/dev/null)
+                if [ $? -eq 0 ]; then
+                    refgenie alias remove -a $alias -d $existing_alias_digest
+                fi
+
+                refgenie alias set --aliases $alias --digest $digest
+                if [ $? -ne 0 ]; then
+                    echo "Aliasing $assembly to $aliases failed" 1>&2
+                    exit 1
+                fi
+            done
         fi
         built=1
     fi

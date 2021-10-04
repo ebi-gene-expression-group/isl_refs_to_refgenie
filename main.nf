@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
+IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
@@ -18,9 +18,9 @@ VIRUSES = Channel.of(['viruses', "${params.contamination.viruses.assembly}", fil
 process find_current_reference_files {
 
     executor 'local'
-
     errorStrategy 'finish'
-
+    conda "${baseDir}/envs/refgenie.yml"
+    
     input: 
         file(confFile) from IRAP_CONFIGS
 
@@ -40,7 +40,7 @@ process find_current_reference_files {
 
     check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
-    if [ \$? -eq 0 ]; then
+    if [ \$? -eq 1 ]; then
         echo -n "\$species" > species.txt
         echo -n "\$assembly" > assembly.txt
         echo -n "\$release" > release.txt
@@ -49,7 +49,6 @@ process find_current_reference_files {
         echo -n "\$gtf_file" > gtf_file.txt
         echo -n "\$tag" > tags.txt
     fi
-    exit 1
     """
 }
 
@@ -58,13 +57,13 @@ CURRENT_REF_FILES
     .into{
         CURRENT_REF_FILES_FOR_NEWEST
         CURRENT_REF_FILES_FOR_DOWNSTREAM
-        CURRENT_REF_FILES_FOR_ALIASING
     }
 
 process find_newest_reference_files {
 
     executor 'local'
     errorStrategy 'finish'
+    conda "${baseDir}/envs/refgenie.yml"
 
     input:
         tuple val(species), val(taxId), val(source), val(genomePattern), val(cdnaPattern), val(gtfPattern), val(assembly) from GENOMES.join(CURRENT_REF_FILES_FOR_NEWEST.map{r -> tuple(r[0])})
@@ -74,17 +73,18 @@ process find_newest_reference_files {
          
     """
     set +e
-    release=\$(detect_newest_isl_genome_release.sh $species ${params.irapDataDir} $gtfPattern)
+    releaseNo=\$(detect_newest_isl_genome_release.sh $species ${params.irapDataDir} $gtfPattern)
+    release=${source}\${releaseNo}
     fileRoot=${params.irapDataDir}/reference/$species
-    reference=\$(echo -n \${fileRoot}/\$(basename $genomePattern | sed "s/RELNO/\${newestRelease}/" | sed 's|primary_assembly|toplevel|'))
-    gtf_file=\$(echo -n \${fileRoot}/\$(basename $gtfPattern | sed "s/RELNO/\${newestRelease}/"))
+    reference=\$(echo -n \${fileRoot}/\$(basename $genomePattern | sed "s/RELNO/\${releaseNo}/" | sed 's|primary_assembly|toplevel|'))
+    gtf_file=\$(echo -n \${fileRoot}/\$(basename $gtfPattern | sed "s/RELNO/\${releaseNo}/"))
 
     # ISL was switched at some point to append the E! release to cDNA files.
     # Ensembl does't do that, but the files do differ between releases. We need
     # to account for versioned and unversioned possibilities.
 
-    unversioned_cdna_fasta=\$(basename $cdnaPattern |  sed "s/RELNO/\${newestRelease}/")
-    versioned_cdna_fasta=\$(echo -e "\$unversioned_cdna_fasta" | sed "s/.fa.gz/.\${newestRelease}.fa.gz/")
+    unversioned_cdna_fasta=\$(basename $cdnaPattern |  sed "s/RELNO/\${releaseNo}/")
+    versioned_cdna_fasta=\$(echo -e "\$unversioned_cdna_fasta" | sed "s/.fa.gz/.\${releaseNo}.fa.gz/")
     
     if [ -e "\${fileRoot}/\$versioned_cdna_fasta" ]; then
         cdna_file=\$(echo -n "\${fileRoot}/\$versioned_cdna_fasta")
@@ -95,7 +95,7 @@ process find_newest_reference_files {
 
     check_refgenie_status.sh "$species" "$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
-    if [ \$? -eq 0 ]; then
+    if [ \$? -eq 1 ]; then
         echo -n "$species" > species.txt
         echo -n "$assembly" > assembly.txt
         echo -n "\$release" > release.txt
@@ -104,7 +104,6 @@ process find_newest_reference_files {
         echo -n "\$gtf_file" > gtf_file.txt
         echo -n "\$tag" > tags.txt
     fi
-    exit 1
     """ 
 }
 
@@ -190,7 +189,10 @@ REF_FILES_FOR_GENOME
     .concat(ECOLI, FUNGI, VIRUSES)
     .concat(CONTAMINATION_GENOMES_FOR_BUILD)
     .map{tuple(it[0], it[1].replace('.', '_'), it[2], it[3])}
-    .set{GENOME_BUILD_INPUTS}
+    .into{
+        GENOME_ALIAS_INPUTS
+        GENOME_BUILD_INPUTS
+    }
 
 process build_genome {
     
@@ -202,7 +204,7 @@ process build_genome {
     conda "${baseDir}/envs/refgenie.yml"
 
     input:
-        tuple val(species), val(assembly), file(filePath), val(additionalTags) from GENOME_BUILD_INPUTS
+        tuple val(species), val(assembly), file(filePath), val(additionalTag) from GENOME_BUILD_INPUTS
 
     output:
         tuple val(species), val(assembly) into GENOME_REFERENCE
@@ -259,6 +261,8 @@ process reduce_genomes {
     refgenie build --reduce -c ${params.refgenieDir}/genome_config.yaml
     """ 
 }
+
+
 
 // The complex cross logic here is just to allow multiple GTFs per assembly
 // (which a join I used initially didn't allow).
@@ -552,19 +556,60 @@ process alias_genomes {
     
     input:
         val('reduced') from REDUCED_SPECIES
-        tuple val(species), val(assembly) from CURRENT_REF_FILES_FOR_ALIASING.map{tuple(it[0], it[1])}
+        tuple val(species), val(assembly), file(filePath), val(additionalTag) from GENOME_ALIAS_INPUTS
 
     output:
          tuple val(species), val(assembly), val('none') into ALIAS_DONE
 
     """
+    set +e
     export REFGENIE=${params.refgenieDir}/genome_config.yaml
-    digest=\$(refgenie alias get -a ${species}--${assembly})
-    refgenie alias set --aliases $species --digest \$digest
-    if [ \$? -ne 0 ]; then
-        echo "Aliasing $assembly to $species failed" 1>&2
-        exit 1
+
+    # The 'current' assembly for a species will be the defult, so set a
+    # species-wide alias for that
+
+    aliases=''
+    
+    spikePart=''
+    echo "$assembly" | grep "spikes" > /dev/null
+    if [ \$? -eq -0 ]; then
+        assembly=$assembly
+        parts=(\${assembly//--/ })
+        spikePart=--\${parts[1]} 
     fi
+    
+    echo -e "$additionalTag" | grep "current" > /dev/null 2>&1
+    if [ \$? -eq 0 ]; then
+        aliases="$species\${spikePart}"
+    fi
+
+    # Non-spiked genomes will be aliased to e.g. homo_sapiens--current. Spiked
+    # genomes will be aliased to e.g. homo_sapiens--current--spikes_ercc
+
+    for tag in \$(echo -e "$additionalTag" | sed 's/,/ /g'); do 
+        alias="${species}--\$tag"
+        if [ -z "\$aliases" ]; then
+            aliases=\$alias\${spikePart}
+        else
+            aliases="\${aliases} \${alias}\${spikePart}"
+        fi
+    done
+
+    # Now alias this assembly    
+
+    digest=\$(refgenie alias get -a ${species}--${assembly})
+    for alias in \$aliases; do
+        existing_alias_digest=\$(refgenie alias get -a \$alias 2>/dev/null)
+        if [ \$? -eq 0 ]; then
+            refgenie alias remove -a \$alias -d \$existing_alias_digest
+        fi
+
+        refgenie alias set --aliases \$alias --digest \$digest
+        if [ \$? -ne 0 ]; then
+            echo "Aliasing \$assembly to \$alias failed" 1>&2
+            exit 1
+        fi
+    done
     """
 }
 

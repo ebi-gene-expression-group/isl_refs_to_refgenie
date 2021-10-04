@@ -25,9 +25,12 @@ function is_asset_new() {
     local tag=$3
     local asset=$4
 
+    echo "Proposed asset: $(basename $asset)" 1>&2
+
     filename=$(refgenie seek ${genome}/${asset_type}:${tag} 2>/dev/null)
     if [ $? -eq 0 ]; then
         orig_asset_name=$(find_orig_refgenie_asset_name $filename)
+        echo "Existing asset: $orig_asset_name"
 
         if [ "$(basename $asset)" = "$orig_asset_name" ]; then
             is_new=0
@@ -59,7 +62,7 @@ fi
 # If the genome reference is new we don't need to check anything else
 
 if [ "$genome_new" = 1 ]; then
-    echo "REFERENCE: ${species}--${tag}/fasta:genome is not new or diferent to Refgenie"
+    echo "REFERENCE: ${species}--${tag}/fasta:genome is new or diferent to Refgenie"
     exit 1
 else
     echo "REFERENCE: ${species}--${tag}/fasta:genome is not new or different to Refgenie"
