@@ -28,6 +28,7 @@ process find_current_reference_files {
         tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') optional true into CURRENT_REF_FILES
 
     """
+    set +e
     species=\$(grep "species=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n')
     assembly=\$( detect_current_isl_genome_assembly.sh $confFile ${params.islGenomes})
     release=\$(detect_current_isl_genome_release.sh $confFile "${params.islGenomes}")
@@ -35,8 +36,9 @@ process find_current_reference_files {
     reference=\$echo -n \${fileRoot}/\$(grep "^reference=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
     cdna_file=\$echo -n \${fileRoot}/\$(grep "^cdna_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
     gtf_file=\$echo -n \${fileRoot}/\$(grep "^gtf_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
+    tag='current'
 
-    check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "current"
+    check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
     if [ $? -eq 0 ]; then
         echo -n "\$species" > species.txt
@@ -45,8 +47,7 @@ process find_current_reference_files {
         echo -n "\$reference" > reference.txt
         echo -n "\$cdna_file" > cdna_file.txt
         echo -n "\$gtf_file" > gtf_file.txt
-        echo -n "current" > tags.txt
-        
+        echo -n "\$tag" > tags.txt
     fi
     """
 }
@@ -68,30 +69,40 @@ process find_newest_reference_files {
         tuple val(species), val(taxId), val(source), val(genomePattern), val(cdnaPattern), val(gtfPattern), val(assembly) from GENOMES.join(CURRENT_REF_FILES_FOR_NEWEST.map{r -> tuple(r[0])})
 
     output:
-        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') into NEWEST_REF_FILES
+        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') optional true into NEWEST_REF_FILES
          
     """
-    # Just making these files for consistency
-    echo -n "$species" > species.txt
-    echo -n "$assembly" > assembly.txt
-
-    newestRelease=\$(detect_newest_isl_genome_release.sh $species ${params.irapDataDir} $gtfPattern)
-    echo -n "${source}\${newestRelease}" > release.txt
-
+    set +e
+    release=\$(detect_newest_isl_genome_release.sh $species ${params.irapDataDir} $gtfPattern)
     fileRoot=${params.irapDataDir}/reference/$species
-    echo -n \${fileRoot}/\$(basename $genomePattern | sed "s/RELNO/\${newestRelease}/" | sed 's|primary_assembly|toplevel|') > reference.txt
-    echo -n \${fileRoot}/\$(basename $gtfPattern | sed "s/RELNO/\${newestRelease}/") > gtf_file.txt
+    reference=\$(echo -n \${fileRoot}/\$(basename $genomePattern | sed "s/RELNO/\${newestRelease}/" | sed 's|primary_assembly|toplevel|'))
+    gtf_file=\$(echo -n \${fileRoot}/\$(basename $gtfPattern | sed "s/RELNO/\${newestRelease}/"))
+
+    # ISL was switched at some point to append the E! release to cDNA files.
+    # Ensembl does't do that, but the files do differ between releases. We need
+    # to account for versioned and unversioned possibilities.
 
     unversioned_cdna_fasta=\$(basename $cdnaPattern |  sed "s/RELNO/\${newestRelease}/")
     versioned_cdna_fasta=\$(echo -e "\$unversioned_cdna_fasta" | sed "s/.fa.gz/.\${newestRelease}.fa.gz/")
     
     if [ -e "\${fileRoot}/\$versioned_cdna_fasta" ]; then
-        echo -n "\${fileRoot}/\$versioned_cdna_fasta" > cdna_file.txt
+        cdna_file=\$(echo -n "\${fileRoot}/\$versioned_cdna_fasta")
     else
-        echo -n "\${fileRoot}/\$unversioned_cdna_fasta" > cdna_file.txt
+        cdna_file=\$(echo -n "\${fileRoot}/\$unversioned_cdna_fasta")
     fi
+    tag='newest'
 
-    echo -n 'newest' > tags.txt
+    check_refgenie_status.sh "$species" "$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
+
+    if [ $? -eq 0 ]; then
+        echo -n "$species" > species.txt
+        echo -n "$assembly" > assembly.txt
+        echo -n "\$release" > release.txt
+        echo -n "\$reference" > reference.txt
+        echo -n "\$cdna_file" > cdna_file.txt
+        echo -n "\$gtf_file" > gtf_file.txt
+        echo -n "\$tag" > tags.txt
+    fi
     """ 
 }
 
