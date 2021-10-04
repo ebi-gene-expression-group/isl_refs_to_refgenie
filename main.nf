@@ -7,7 +7,7 @@ SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.to
 SPIKES=SPIKES_GENOME.join(SPIKES_CDNA).join(SPIKES_GTF)
 
 SPIKES_CDNA_GTF = Channel.fromPath( "${baseDir}/spikes/*/*transcripts.gtf.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
-GENOMES = Channel.fromPath( "${params.islGenomes}" ).splitText().map{r -> r.split()}.filter{ it.size() == 7 }.map{ r -> r*.toString() }
+GENOMES = Channel.fromPath( "${params.islGenomes}" ).splitText().map{r -> r.split()}.filter{ it.size() == 7 }.map{ r -> r*.toString() }.filter{it[0] == 'drosophila_melanogaster'}
         
 ECOLI = Channel.of(['escherichia_coli', "${params.contamination.ecoli.assembly}", file("${params.contamination.ecoli.uri}"), 'default']).first()
 FUNGI = Channel.of(['fungi', "${params.contamination.fungi.assembly}", file("${params.contamination.fungi.uri}"), 'default']).first()
@@ -40,7 +40,7 @@ process find_current_reference_files {
 
     check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
-    if [ $? -eq 0 ]; then
+    if [ \$? -eq 0 ]; then
         echo -n "\$species" > species.txt
         echo -n "\$assembly" > assembly.txt
         echo -n "\$release" > release.txt
@@ -49,6 +49,7 @@ process find_current_reference_files {
         echo -n "\$gtf_file" > gtf_file.txt
         echo -n "\$tag" > tags.txt
     fi
+    exit 1
     """
 }
 
@@ -94,7 +95,7 @@ process find_newest_reference_files {
 
     check_refgenie_status.sh "$species" "$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
-    if [ $? -eq 0 ]; then
+    if [ \$? -eq 0 ]; then
         echo -n "$species" > species.txt
         echo -n "$assembly" > assembly.txt
         echo -n "\$release" > release.txt
@@ -103,6 +104,7 @@ process find_newest_reference_files {
         echo -n "\$gtf_file" > gtf_file.txt
         echo -n "\$tag" > tags.txt
     fi
+    exit 1
     """ 
 }
 
