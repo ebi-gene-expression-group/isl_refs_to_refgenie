@@ -30,12 +30,12 @@ process find_current_reference_files {
     """
     set +e
     species=\$(grep "species=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n')
-    assembly=\$( detect_current_isl_genome_assembly.sh $confFile ${params.islGenomes})
+    assembly=\$(detect_current_isl_genome_assembly.sh $confFile ${params.islGenomes})
     release=\$(detect_current_isl_genome_release.sh $confFile "${params.islGenomes}")
     fileRoot=${params.irapDataDir}/reference/\$species
-    reference=\$echo -n \${fileRoot}/\$(grep "^reference=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
-    cdna_file=\$echo -n \${fileRoot}/\$(grep "^cdna_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
-    gtf_file=\$echo -n \${fileRoot}/\$(grep "^gtf_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
+    reference=\$(echo -n \${fileRoot}/\$(grep "^reference=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
+    cdna_file=\$(echo -n \${fileRoot}/\$(grep "^cdna_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
+    gtf_file=\$(echo -n \${fileRoot}/\$(grep "^gtf_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
     tag='current'
 
     check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
