@@ -1,13 +1,14 @@
 #!/usr/bin/env nextflow
 
-IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
+//IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
+IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES=SPIKES_GENOME.join(SPIKES_CDNA).join(SPIKES_GTF)
 
 SPIKES_CDNA_GTF = Channel.fromPath( "${baseDir}/spikes/*/*transcripts.gtf.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
-GENOMES = Channel.fromPath( "${params.islGenomes}" ).splitText().map{r -> r.split()}.filter{ it.size() == 7 }.map{ r -> r*.toString() }.filter{it[0] == 'drosophila_melanogaster'}
+GENOMES = Channel.fromPath( "${params.islGenomes}" ).splitText().map{r -> r.split()}.filter{ it.size() == 7 }.map{ r -> r*.toString() }
         
 ECOLI = Channel.of(['escherichia_coli', "${params.contamination.ecoli.assembly}", file("${params.contamination.ecoli.uri}"), 'default']).first()
 FUNGI = Channel.of(['fungi', "${params.contamination.fungi.assembly}", file("${params.contamination.fungi.uri}"), 'default']).first()
@@ -17,7 +18,6 @@ VIRUSES = Channel.of(['viruses', "${params.contamination.viruses.assembly}", fil
 
 process find_current_reference_files {
 
-    executor 'local'
     errorStrategy 'finish'
     conda "${baseDir}/envs/refgenie.yml"
     
@@ -25,7 +25,7 @@ process find_current_reference_files {
         file(confFile) from IRAP_CONFIGS
 
     output:
-        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') optional true into CURRENT_REF_FILES
+        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt'), file('build.txt') into CURRENT_REF_FILES
 
     """
     set +e
@@ -41,14 +41,19 @@ process find_current_reference_files {
     check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
     if [ \$? -eq 1 ]; then
-        echo -n "\$species" > species.txt
-        echo -n "\$assembly" > assembly.txt
-        echo -n "\$release" > release.txt
-        echo -n "\$reference" > reference.txt
-        echo -n "\$cdna_file" > cdna_file.txt
-        echo -n "\$gtf_file" > gtf_file.txt
-        echo -n "\$tag" > tags.txt
+        build='true'
+    else
+        build='false'
     fi
+    
+    echo -n "\$species" > species.txt
+    echo -n "\$assembly" > assembly.txt
+    echo -n "\$release" > release.txt
+    echo -n "\$reference" > reference.txt
+    echo -n "\$cdna_file" > cdna_file.txt
+    echo -n "\$gtf_file" > gtf_file.txt
+    echo -n "\$tag" > tags.txt
+    echo -n "\$build" > build.txt
     """
 }
 
@@ -61,7 +66,6 @@ CURRENT_REF_FILES
 
 process find_newest_reference_files {
 
-    executor 'local'
     errorStrategy 'finish'
     conda "${baseDir}/envs/refgenie.yml"
 
@@ -69,7 +73,7 @@ process find_newest_reference_files {
         tuple val(species), val(taxId), val(source), val(genomePattern), val(cdnaPattern), val(gtfPattern), val(assembly) from GENOMES.join(CURRENT_REF_FILES_FOR_NEWEST.map{r -> tuple(r[0])})
 
     output:
-        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt') optional true into NEWEST_REF_FILES
+        tuple file('species.txt'), file('assembly.txt'), file('release.txt'), file('reference.txt'), file('cdna_file.txt'), file('gtf_file.txt'), file('tags.txt'), file('build.txt') into NEWEST_REF_FILES
          
     """
     set +e
@@ -96,19 +100,25 @@ process find_newest_reference_files {
     check_refgenie_status.sh "$species" "$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
     if [ \$? -eq 1 ]; then
-        echo -n "$species" > species.txt
-        echo -n "$assembly" > assembly.txt
-        echo -n "\$release" > release.txt
-        echo -n "\$reference" > reference.txt
-        echo -n "\$cdna_file" > cdna_file.txt
-        echo -n "\$gtf_file" > gtf_file.txt
-        echo -n "\$tag" > tags.txt
+        build='true'
+    else
+        build='false'
     fi
+
+    echo -n "$species" > species.txt
+    echo -n "$assembly" > assembly.txt
+    echo -n "\$release" > release.txt
+    echo -n "\$reference" > reference.txt
+    echo -n "\$cdna_file" > cdna_file.txt
+    echo -n "\$gtf_file" > gtf_file.txt
+    echo -n "\$tag" > tags.txt
+    echo -n "\$build" > build.txt
     """ 
 }
 
 CURRENT_REF_FILES_FOR_DOWNSTREAM
     .concat(NEWEST_REF_FILES.map{ r -> r*.text })
+    .filter{ it[7] == 'true' } 
     .map{tuple(it[0], it[1].replace('.', '_'), it[2], file(it[3]), file(it[4]), file(it[5]), it[6])}
     .set{
         REF_FILES
@@ -262,8 +272,6 @@ process reduce_genomes {
     """ 
 }
 
-
-
 // The complex cross logic here is just to allow multiple GTFs per assembly
 // (which a join I used initially didn't allow).
 
@@ -274,33 +282,6 @@ GENOME_REFERENCE_FOR_POSTGENOME.map{r -> tuple(r[0] + r[1], r).flatten()}
         GTF_BUILD_INPUTS
         CDNA_BUILD_INPUTS
     }
-
-process build_annotation {
-    
-    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
-    maxRetries 3
-    
-    conda "${baseDir}/envs/refgenie.yml"
-
-    input:
-        val(reduced) from REDUCED_REFERENCES
-        tuple val(species), val(assembly), val(version), val(filePath), val(additionalTags) from GTF_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}
-
-    output:
-        tuple val(species), val(assembly), val('none') into ANNOTATION_DONE
-
-    """
-    build_asset.sh \
-        -a ${species}--${assembly} \
-        -r ensembl_gtf \
-        -f ensembl_gtf  \
-        -p $filePath \
-        -d ${params.refgenieDir} \
-        -m yes \
-        -b true \
-        -t ${version},${additionalTags}
-    """
-}
 
 process build_cdna {
  
@@ -338,9 +319,10 @@ CDNA_REFERENCE
     }
 
 // Build all cDNAs in parallel followed by a reduction step before dependent
-// processes (Salmon and Kallisto indexing). This allows us to do lots of
-// things in parallel while still having asset dependencies in place at the
-// right time
+// processes (Salmon and Kallisto indexing) and genome-centric downstream
+// processes that would be disrupted by a reduce (hisat and anno). This allows
+// us to do lots of things in parallel while still having asset dependencies in
+// place at the right time
 
 CDNA_REFERENCE_FOR_COLLECTION
     .collect()
@@ -369,6 +351,34 @@ process reduce_cdnas {
     """ 
 }
 
+process build_annotation {
+    
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
+    
+    conda "${baseDir}/envs/refgenie.yml"
+
+    input:
+        val(reduced) from REDUCED_REFERENCES
+        val(reduced) from REDUCED_CDNAS
+        tuple val(species), val(assembly), val(version), val(filePath), val(additionalTags) from GTF_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}
+
+    output:
+        tuple val(species), val(assembly), val('none') into ANNOTATION_DONE
+
+    """
+    build_asset.sh \
+        -a ${species}--${assembly} \
+        -r ensembl_gtf \
+        -f ensembl_gtf  \
+        -p $filePath \
+        -d ${params.refgenieDir} \
+        -m yes \
+        -b true \
+        -t ${version},${additionalTags}
+    """
+}
+
 // In the below, we make everything dependent on the completion of the
 // annotation and cDNA builds. This is not because of a functional dependency,
 // rather because we can't run 'map' operations alongside 'reduce' operations.
@@ -387,6 +397,7 @@ process build_hisat_index {
 
     input:
         val(reduced) from REDUCED_REFERENCES
+        val(reduced) from REDUCED_CDNAS
         tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_HISAT
 
     output:
@@ -420,6 +431,7 @@ process build_bowtie2_index {
 
     input:
         val(reduced) from REDUCED_REFERENCES
+        val(reduced) from REDUCED_CDNAS
         tuple val(species), val(assembly) from GENOME_REFERENCE_FOR_BOWTIE2.join(CONTAMINATION_GENOMES_FOR_BOWTIE2).map{ r -> tuple(r[0], r[1]) }
 
     output:
