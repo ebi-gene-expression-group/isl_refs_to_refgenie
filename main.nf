@@ -556,6 +556,25 @@ process reduce {
     """ 
 }
 
+// Get a list of current aliases, which will be used to determine necessary updates
+
+process get_alias_table {
+
+    conda "${baseDir}/envs/refgenie.yml"
+    
+    input:
+        val('reduced') from REDUCED_SPECIES
+   
+    output:
+        file('alias_table.txt') into ALIAS_TABLE 
+
+    """
+    refgenie alias get > alias.table.txt.tmp
+    mv alias_table.txt.tmp alias_table.txt 
+    """
+}
+
+
 // By making aliasing dependent on the output of the reduction of indices we
 // can use aliasing as a marker of completion for a species
 
@@ -567,7 +586,7 @@ process alias_genomes {
     maxForks 1
     
     input:
-        val('reduced') from REDUCED_SPECIES
+        file(aliasTable) from ALIAS_TABLE
         tuple val(species), val(assembly), file(filePath), val(additionalTag) from GENOME_ALIAS_INPUTS
 
     output:
@@ -608,18 +627,28 @@ process alias_genomes {
     done
 
     # Now alias this assembly    
+    digest=$(digest_from_alias.sh ${species}--${assembly} $aliasTable)
 
-    digest=\$(refgenie alias get -a ${species}--${assembly})
     for alias in \$aliases; do
-        existing_alias_digest=\$(refgenie alias get -a \$alias 2>/dev/null)
-        if [ \$? -eq 0 ]; then
+        existing_alias_digest=\$(digest_from_alias.sh \$alias alias_table.txt)
+        found_existing=\$?
+
+        # If the alias exists, but points to a different digest, then remove
+        # the previous
+
+        if [ "\$found_existing -eq '0' ] && [ "\$existing_atlas_digest" != "\$digest" ]; then
             refgenie alias remove -a \$alias -d \$existing_alias_digest
         fi
 
-        refgenie alias set --aliases \$alias --digest \$digest
-        if [ \$? -ne 0 ]; then
-            echo "Aliasing \$assembly to \$alias failed" 1>&2
-            exit 1
+        # The the alias didn't already exist, or did not match the current
+        # digest (and so was removed), then add it
+
+        if [ "\$found_existing" -eq '1' ] || [ "\$existing_atlas_digest" != "\$digest" ]; then
+            refgenie alias set --aliases \$alias --digest \$digest
+            if [ \$? -ne 0 ]; then
+                echo "Aliasing \$assembly to \$alias failed" 1>&2
+                exit 1
+            fi
         fi
     done
     """
