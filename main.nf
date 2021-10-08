@@ -569,7 +569,7 @@ process get_alias_table {
         file('alias_table.txt') into ALIAS_TABLE 
 
     """
-    refgenie alias get > alias.table.txt.tmp
+    refgenie alias get > alias_table.txt.tmp
     mv alias_table.txt.tmp alias_table.txt 
     """
 }
@@ -627,10 +627,10 @@ process alias_genomes {
     done
 
     # Now alias this assembly    
-    digest=$(digest_from_alias.sh ${species}--${assembly} $aliasTable)
+    digest=\$(digest_from_alias.sh ${species}--${assembly} $aliasTable)
 
     for alias in \$aliases; do
-        existing_alias_digest=\$(digest_from_alias.sh \$alias alias_table.txt)
+        existing_alias_digest=\$(digest_from_alias.sh \$alias ${aliasTable})
         found_existing=\$?
 
         # If the alias exists, but points to a different digest, then remove
