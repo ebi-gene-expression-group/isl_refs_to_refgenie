@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-//IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
+//IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'mus_musculus'}
 IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
@@ -569,7 +569,7 @@ process get_alias_table {
         file('alias_table.txt') into ALIAS_TABLE 
 
     """
-    refgenie alias get > alias_table.txt.tmp
+    env COLUMNS=500 refgenie alias get > alias_table.txt.tmp
     mv alias_table.txt.tmp alias_table.txt 
     """
 }
@@ -636,19 +636,23 @@ process alias_genomes {
         # If the alias exists, but points to a different digest, then remove
         # the previous
 
-        if [ "\$found_existing -eq '0' ] && [ "\$existing_atlas_digest" != "\$digest" ]; then
+        if [ "\$found_existing" -eq '0' ] && [ "\$existing_alias_digest" != "\$digest" ]; then
+            echo "Removing alias \$alias on  \$existing_alias_digest to re-point it at \$digest"
             refgenie alias remove -a \$alias -d \$existing_alias_digest
         fi
 
         # The the alias didn't already exist, or did not match the current
         # digest (and so was removed), then add it
 
-        if [ "\$found_existing" -eq '1' ] || [ "\$existing_atlas_digest" != "\$digest" ]; then
+        if [ "\$found_existing" -eq '1' ] || [ "\$existing_alias_digest" != "\$digest" ]; then
+            echo "Aliasing \$digest to \$alias"
             refgenie alias set --aliases \$alias --digest \$digest
             if [ \$? -ne 0 ]; then
                 echo "Aliasing \$assembly to \$alias failed" 1>&2
                 exit 1
             fi
+        else
+            echo "\$alias was already pointing at \$digest"
         fi
     done
     """
