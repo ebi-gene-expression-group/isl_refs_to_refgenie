@@ -17,6 +17,19 @@ function find_orig_refgenie_asset_name() {
     basename $(grep "cp " $(dirname $asset_path)/_refgenie_build/refgenie_commands.sh | head -n 1 | awk '{print $2}')
 }
 
+function get_sha() {
+    local infile=$1
+    
+    echo "$infile" | grep ".gz$" > /dev/null 2>&1
+    if [ $? -eq 0 ]; then
+        sha=$(gzip -d -c "$infile" | sha256sum | awk '{print $1}')
+    else
+        sha=$(sha256sum "$infile" | awk '{print $1}')
+    fi
+    
+    echo -n "$sha"
+}
+
 function is_asset_new() {
     local is_new=1
 
@@ -33,15 +46,8 @@ function is_asset_new() {
         echo "${genome}/${asset_type}:${tag} does alreeady exist, derived from $orig_asset_name"
 
         if [ "$(basename $asset)" = "$orig_asset_name" ]; then
-            orig_asset_sha=$(sha256sum $filename | awk '{print $1}')
-            
-            # Refgenie will provide uncompressed file, so uncompress input for SHA
-            echo "$asset" | grep ".gz$" > /dev/null 2>&1
-            if [ $? -eq 0 ]; then
-                new_asset_sha=$(gzip -d -c "$asset" | sha256sum | awk '{print $1}')
-            else
-                new_asset_sha=$(sha256sum "$asset" | awk '{print $1}')
-            fi
+            orig_asset_sha=$(get_sha $filename)
+            new_asset_sha=$(get_sha $asset)
            
             if [ "$orig_asset_sha" = "$new_asset_sha" ]; then
                 echo "Existing SHA from $filename is identical to that of $asset: $new_asset_sha, we don't need a rebuild"
