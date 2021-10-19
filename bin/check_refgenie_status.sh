@@ -28,12 +28,29 @@ function is_asset_new() {
     echo "Proposed asset: $(basename $asset)" 1>&2
 
     filename=$(refgenie seek ${genome}/${asset_type}:${tag} 2>/dev/null)
-    if [ $? -eq 0 ]; then
+    if [ $? -eq 0 ]; then    
         orig_asset_name=$(find_orig_refgenie_asset_name $filename)
-        echo "Existing asset: $orig_asset_name"
+        echo "${genome}/${asset_type}:${tag} does alreeady exist, derived from $orig_asset_name"
 
         if [ "$(basename $asset)" = "$orig_asset_name" ]; then
-            is_new=0
+            orig_asset_sha=$(sha256sum $filename | awk '{print $1}')
+            
+            # Refgenie will provide uncompressed file, so uncompress input for SHA
+            echo "$asset" | grep ".gz$" > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+                new_asset_sha=$(gzip -d -c "$asset" | sha256sum | awk '{print $1}')
+            else
+                new_asset_sha=$(sha256sum "$asset" | awk '{print $1}')
+            fi
+           
+            if [ "$orig_asset_sha" = "$new_asset_sha" ]; then
+                echo "Existing SHA from $filename is identical to that of $asset: $new_asset_sha, we don't need a rebuild"
+                is_new=0
+            else 
+                echo "Current SHA ($orig_asset_sha from $filename) is different from proposed file ($new_asset_sha from $asset)"
+            fi
+        else
+            echo "New asset $(basename $asset) is different to $orig_asset_name"
         fi
     fi
     
