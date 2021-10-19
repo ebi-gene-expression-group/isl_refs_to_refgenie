@@ -38,7 +38,7 @@ process find_current_reference_files {
     gtf_file=\$(echo -n \${fileRoot}/\$(grep "^gtf_file=" $confFile | awk -F'=' '{print \$2}' | tr -d '\\n'))    
     tag='current'
 
-    check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
+    env COLUMNS=500 check_refgenie_status.sh "\$species" "\$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
     if [ \$? -eq 1 ]; then
         build='true'
@@ -97,7 +97,7 @@ process find_newest_reference_files {
     fi
     tag='newest'
 
-    check_refgenie_status.sh "$species" "$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
+    env COLUMNS=500 check_refgenie_status.sh "$species" "$assembly" "\$release" "\$reference" "\$cdna_file" "\$gtf_file" "\$tag"
 
     if [ \$? -eq 1 ]; then
         build='true'
