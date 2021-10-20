@@ -66,7 +66,7 @@ elif [ -n "$assets" ]; then
     assetsPart="--assets $assets "
 fi
 if [ -n "$forceRebuild" ]; then
-    rebuildPart=' -N '
+    rebuildPart=' -N -R'
 fi
 
 built=0
