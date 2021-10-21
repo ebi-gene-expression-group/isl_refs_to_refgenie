@@ -14,7 +14,7 @@ tag=$7
 
 function find_orig_refgenie_asset_name() {     
     asset_path=$1     
-    basename $(grep "cp " $(dirname $asset_path)/_refgenie_build/refgenie_commands.sh | head -n 1 | awk '{print $2}')
+    basename $(grep "cp " $(dirname $asset_path)/_refgenie_build/refgenie_commands.sh | tail -n 1 | awk '{print $2}')
 }
 
 function get_sha() {
