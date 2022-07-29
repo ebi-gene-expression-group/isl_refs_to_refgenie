@@ -280,6 +280,7 @@ GENOME_REFERENCE_FOR_POSTGENOME.map{r -> tuple(r[0] + r[1], r).flatten()}
     .map{it[1][1..-1]}
     .into{
         GTF_BUILD_INPUTS
+        GTF_SPLICI_BUILD_INPUTS
         CDNA_BUILD_INPUTS
     }
 
@@ -314,7 +315,6 @@ process build_cdna {
 CDNA_REFERENCE
     .into{
         CDNA_REFERENCE_FOR_COLLECTION
-        CDNA_REFERENCE_FOR_SALMON
         CDNA_REFERENCE_FOR_KALLISTO
     }
 
@@ -345,6 +345,77 @@ process reduce_cdnas {
 
     output:
         val('reduced') into REDUCED_CDNAS
+
+    """
+    refgenie build --reduce -c ${params.refgenieDir}/genome_config.yaml
+    """ 
+}
+
+# build a assets for splici trancritome
+
+process build_splici_txome {
+ 
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+    maxRetries 3
+    
+    conda "${baseDir}/envs/refgenie.yml"
+
+    input:
+        val(reduced) from REDUCED_REFERENCES
+        tuple val(species), val(assembly), file(filePath), val(additionalTag) from SPLICI_BUILD_INPUTS        
+        tuple val(species), val(assembly), val(version), val(gtf), val(additionalTags) from GTF_SPLICI_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}
+
+       
+    output:
+        tuple val(species), val(assembly), val(version), val(additionalTags) into SPLICI_REFERENCE
+      
+    """
+    gunzip -f $filePath 
+    gunzip -f $gtf
+    pyroe make-splici *.fa *.gtf 90 splici --filename-prefix ${species}.${assembly}.
+    gzip splici/*.fa
+    
+    build_asset.sh \
+        -a ${species}--${assembly} \
+        -r fasta_txome \
+        -f fasta \
+        -p splici/*.fa.gz \
+        -d ${params.refgenieDir} \
+        -t ${version},${additionalTags} \
+        -m yes \
+        -b true \
+        -x splici_ 
+    """
+}
+
+SPLICI_REFERENCE
+    .into{
+        SPLICI_REFERENCE_FOR_COLLECTION
+        SPLICI_REFERENCE_FOR_SALMON
+    }
+
+
+SPLICI_REFERENCE_FOR_COLLECTION
+    .collect()
+    .map { r -> 'collected' }
+    .set{
+        COLLECTED_SPLICI
+    }
+
+process reduce_splici {
+
+    conda "${baseDir}/envs/refgenie.yml"
+    errorStrategy 'finish'
+    
+    memory { 20.GB * task.attempt }
+    
+    maxForks 1
+    
+    input:
+        val(collected) from COLLECTED_SPLICI
+
+    output:
+        val('reduced') into REDUCED_SPLICI
 
     """
     refgenie build --reduce -c ${params.refgenieDir}/genome_config.yaml
@@ -459,15 +530,15 @@ process build_salmon_index {
     maxRetries 3
 
     input:
-        val(reduced) from REDUCED_CDNAS
-        tuple val(species), val(assembly), val(version), val(additionalTags) from CDNA_REFERENCE_FOR_SALMON
+        val(reduced) from REDUCED_SPLICI
+        tuple val(species), val(assembly), val(version), val(additionalTags) from SPLICI_REFERENCE_FOR_SALMON
 
     output:
         tuple val(species), val(assembly), val(version) into SALMON_DONE
 
     """
     salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
-    cdna_asset="fasta=${species}--${assembly}/fasta_txome:cdna_${version}"
+    splici_asset="fasta=${species}--${assembly}/fasta_txome:splici_${version}"
     
     # Append the salmon version to all the input tags
     tags=\$(for at in \$(echo ${version} ${additionalTags} | tr "," "\\n"); do
@@ -478,10 +549,10 @@ process build_salmon_index {
         -r salmon_index \
         -d ${params.refgenieDir} \
         -t \$tags \
-        -x 'cdna_' \
+        -x 'splici_' \
         -m yes \
         -b true \
-        -s \$cdna_asset
+        -s \$splici_asset
     """
 }
 
