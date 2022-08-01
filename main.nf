@@ -202,6 +202,7 @@ REF_FILES_FOR_GENOME
     .into{
         GENOME_ALIAS_INPUTS
         GENOME_BUILD_INPUTS
+        SPLICI_BUILD_INPUTS
     }
 
 process build_genome {
