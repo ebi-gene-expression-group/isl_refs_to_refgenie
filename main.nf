@@ -351,7 +351,7 @@ process reduce_cdnas {
     """ 
 }
 
-\\ build a assets for splici trancritome
+// build a assets for splici trancritome
 
 process build_splici_txome {
  
