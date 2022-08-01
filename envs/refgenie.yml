@@ -1,4 +1,8 @@
 name: refgenie
+channels:
+  - conda-forge
+  - bioconda
+  - default
 dependencies:
   - refgenie=0.12.0
   - samtools
