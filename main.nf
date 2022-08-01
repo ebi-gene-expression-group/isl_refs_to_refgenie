@@ -364,7 +364,7 @@ process build_splici_txome {
     input:
         val(reduced) from REDUCED_REFERENCES
         tuple val(species), val(assembly), file(filePath), val(additionalTag) from SPLICI_BUILD_INPUTS        
-        tuple val(species), val(assembly), val(version), val(gtf), val(additionalTags) from GTF_SPLICI_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}
+        tuple val(species), val(assembly), val(version), file(gtf), val(additionalTags) from GTF_SPLICI_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}
 
        
     output:
