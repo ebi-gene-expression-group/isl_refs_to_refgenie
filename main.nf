@@ -363,7 +363,7 @@ process build_splici_txome {
 
     input:
         val(reduced) from REDUCED_REFERENCES
-        tuple val(species), val(assembly), file(filePath), val(additionalTag_genome), val(version), file(gtf), val(additionalTags) from SPLICI_BUILD_INPUTS.join( GTF_SPLICI_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}, by: [0, 1])
+        tuple val(species), val(assembly), file(filePath), val(additionalTag_genome), val(version), file(gtf), val(additionalTags) from SPLICI_BUILD_INPUTS.join( GTF_SPLICI_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}, by: [0, 1], remainder: true)
        
     output:
         tuple val(species), val(assembly), val(version), val(additionalTags) into SPLICI_REFERENCE
