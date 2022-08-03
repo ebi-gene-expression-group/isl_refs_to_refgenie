@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
-//IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'mus_musculus'}
-IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
+IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
+// IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
@@ -363,7 +363,7 @@ process build_splici_txome {
 
     input:
         val(reduced) from REDUCED_REFERENCES
-        tuple val(species), val(assembly), file(filePath), val(additionalTag_genome), val(version), file(gtf), val(additionalTags) from SPLICI_BUILD_INPUTS.join( GTF_SPLICI_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}, by: [0, 1], remainder: true)
+        tuple val(species), val(assembly), file(filePath), val(additionalTag_genome), val(version), file(gtf), val(additionalTags) from SPLICI_BUILD_INPUTS.combine( GTF_SPLICI_BUILD_INPUTS.map{r -> tuple(r[0], r[1], r[2], r[5], r[6])}, by: [0, 1])
        
     output:
         tuple val(species), val(assembly), val(version), val(additionalTags) into SPLICI_REFERENCE
