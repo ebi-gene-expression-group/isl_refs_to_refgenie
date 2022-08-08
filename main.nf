@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
-IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
-// IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
+// IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
+IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_CDNA = Channel.fromPath( "${baseDir}/spikes/*/*.transcripts.fa.gz" ).map{r -> tuple(r.toString().split('/')[-2], r)}
 SPIKES_GTF = Channel.fromPath( "${baseDir}/spikes/*/*.gtf.gz" ).filter  { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
