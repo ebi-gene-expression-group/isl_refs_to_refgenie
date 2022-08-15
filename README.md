@@ -15,6 +15,7 @@ nextflow run isl_refs_to_refgenie/main.nf \
     --irapDataDir=<path to top level IRAP data directory, with 'references' subdirectory> \
     --refgenieDir=<path to refgenie top directory> \
     --islGenomes=<path togenome_references.conf>
+    --mode=<type of salmon index: [normal, splici]>
 ```
 
 ## What's done
@@ -34,7 +35,7 @@ Input files are discovered for each species:
 
 ### Building Refgenie assets
 
-The plain base genome FASTA is used as the root asset for an assembly. All others (cDNAs, GTFs etc) are sub-assets of that. Genomes, transcriptomes and GTFs are also combined with spike-ins (currently just ERCC) and built/indexed under a separate root asset.
+The plain base genome FASTA is used as the root asset for an assembly. All others (cDNAs, GTFs etc) are sub-assets of that. Genomes, transcriptomes and GTFs are also combined with spike-ins (currently just ERCC) and built/indexed under a separate root asset. The intron-containing splici transcriptome asset is build with ```pyroe make-splici``` from the genome FASTA.
 
 ### Genome indices
 
@@ -43,6 +44,7 @@ All genome resources are indexed by hisat2. Contamination indices are also index
 #### Transcriptome indices
 
 Each of the 4 transcriptome assets for each species (current and newest, with/without spikes) is indexed by both Kallisto and Salmon, with versions picked to match our single-cell pipelines.
+The Salmon indices can be eiher build with the cDNA ('normal') or an intron containing transcriptome can be indexed ('splici').
 
 ## Result
 
