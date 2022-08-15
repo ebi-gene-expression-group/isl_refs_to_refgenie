@@ -1,5 +1,8 @@
 #!/usr/bin/env nextflow
 
+// mode parameter defines if normal or splici salmon index is build
+mode = params.mode
+
 // IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
 IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf")
 SPIKES_GENOME = Channel.fromPath( "${baseDir}/spikes/*/*.fa.gz" ).filter { !it.toString().contains('transcript') }.map{r -> tuple(r.toString().split('/')[-2], r)}
@@ -316,6 +319,7 @@ process build_cdna {
 CDNA_REFERENCE
     .into{
         CDNA_REFERENCE_FOR_COLLECTION
+        CDNA_REFERENCE_FOR_SALMON
         CDNA_REFERENCE_FOR_KALLISTO
     }
 
@@ -534,16 +538,36 @@ process build_salmon_index {
 
     output:
         tuple val(species), val(assembly), val(version) into SALMON_DONE
-
-    """
-    salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
-    splici_asset="fasta=${species}--${assembly}/fasta_txome:splici_${version}"
+        
+    script:
+    if( mode == 'normal' )
+        """
+        salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
+        cdna_asset="fasta=${species}--${assembly}/fasta_txome:cdna_${version}"
+     
+         # Append the salmon version to all the input tags
+        tags=\$(for at in \$(echo ${version} ${additionalTags} | tr "," "\\n"); do
+                echo "\${at}--salmon_v\${salmon_version}"
+        done | tr '\\n' ',' | sed 's/,\$//')  
+        build_asset.sh \
+         -r salmon_index \
+         -d ${params.refgenieDir} \
+         -t \$tags \
+         -x 'cdna_' \
+         -m yes \
+         -b true \
+         -s \$cdna_asset
+        """
+    else if( mode == 'splici' )
+        """
+        salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
+        splici_asset="fasta=${species}--${assembly}/fasta_txome:splici_${version}"
     
-    # Append the salmon version to all the input tags
-    tags=\$(for at in \$(echo ${version} ${additionalTags} | tr "," "\\n"); do
-        echo "\${at}--salmon_v\${salmon_version}"
-    done | tr '\\n' ',' | sed 's/,\$//')  
-    build_asset.sh \
+        # Append the salmon version to all the input tags
+        tags=\$(for at in \$(echo ${version} ${additionalTags} | tr "," "\\n"); do
+                echo "\${at}--salmon_v\${salmon_version}"
+        done | tr '\\n' ',' | sed 's/,\$//')  
+        build_asset.sh \
         -a ${species}--${assembly} \
         -r salmon_index \
         -d ${params.refgenieDir} \
@@ -552,7 +576,11 @@ process build_salmon_index {
         -m yes \
         -b true \
         -s \$splici_asset
-    """
+        """
+     else
+        """
+        error "Invalid salmon mode: ${mode}"
+        """
 }
 
 process build_kallisto_index {
