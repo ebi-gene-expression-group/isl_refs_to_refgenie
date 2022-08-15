@@ -551,6 +551,7 @@ process build_salmon_index {
                 echo "\${at}--salmon_v\${salmon_version}"
         done | tr '\\n' ',' | sed 's/,\$//')  
         build_asset.sh \
+         -a ${species}--${assembly} \
          -r salmon_index \
          -d ${params.refgenieDir} \
          -t \$tags \
