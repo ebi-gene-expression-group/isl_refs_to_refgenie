@@ -564,10 +564,10 @@ process build_salmon_index {
         """
         salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
         splici_asset="fasta=${species}--${assembly}/fasta_txome:splici_${version}"
-    
+        
         # Append the salmon version to all the input tags
         tags=\$(for at in \$(echo ${version} ${additionalTags} | tr "," "\\n"); do
-                echo "\${at}--salmon_v\${salmon_version}"
+                 echo "\${at}--salmon_v\${salmon_version}"
         done | tr '\\n' ',' | sed 's/,\$//')  
         build_asset.sh \
         -a ${species}--${assembly} \
