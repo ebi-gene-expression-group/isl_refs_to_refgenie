@@ -10,4 +10,4 @@ dependencies:
   - kallisto=0.46.2
   - hisat2=2.2.1
   - bowtie2=2.4.5
-  - pyroe
+  - pyroe=0.6.2
