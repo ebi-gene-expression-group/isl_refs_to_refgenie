@@ -11,7 +11,7 @@ This workflow is designed to copy all of the base genome resources used by the g
 
 ```
 nextflow run isl_refs_to_refgenie/main.nf \
-    --mode=<type of salmon index: [normal, splici]>
+    --mode=<type of salmon index: [normal, splici]> \
     --irapConfigDir=<path to directory with species-wise configuration files as used by IRAP> \
     --irapDataDir=<path to top level IRAP data directory, with 'references' subdirectory> \
     --refgenieDir=<path to refgenie top directory> \
