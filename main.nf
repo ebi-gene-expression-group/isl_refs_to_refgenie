@@ -1,6 +1,6 @@
 #!/usr/bin/env nextflow
 
-// mode parameter defines if normal or splici salmon index is build
+// mode parameter defines if normal and/or splici salmon index is build
 mode = params.mode
 
 // IRAP_CONFIGS = Channel.fromPath( "${params.irapConfigDir}/*.conf").filter{it.baseName == 'drosophila_melanogaster'}
@@ -547,7 +547,7 @@ process build_salmon_index {
         tuple val(species), val(assembly), val(version) into SALMON_DONE
         
     script:
-    if( mode == 'normal' )
+    if( mode == 'normal' || mode == 'both' )
         """
         salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
         cdna_asset="fasta=${species}--${assembly}/fasta_txome:cdna_${version}"
@@ -566,7 +566,7 @@ process build_salmon_index {
          -b true \
          -s \$cdna_asset
         """
-    else if( mode == 'splici' )
+    if( mode == 'splici' || mode == 'both' )
         """
         salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
         splici_asset="fasta=${species}--${assembly}/fasta_txome:splici_${version}"
