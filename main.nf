@@ -400,7 +400,7 @@ SPLICI_REFERENCE
     
 CDNA_REFERENCE_FOR_SALMON
    .join( SPLICI_REFERENCE_FOR_SALMON)
-   .into {
+   .set {
       REFERENCE_FOR_SALMON
       }
 
@@ -541,7 +541,7 @@ process build_salmon_index {
     input:
         val(reduced) from REDUCED_SPLICI
         val(reduced) from REDUCED_CDNAS
-        tuple val(species), val(assembly), val(version), val(additionalTags) from SPLICI_REFERENCE
+        tuple val(species), val(assembly), val(version), val(additionalTags) from REFERENCE_FOR_SALMON
 
     output:
         tuple val(species), val(assembly), val(version) into SALMON_DONE
