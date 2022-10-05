@@ -11,7 +11,7 @@ This workflow is designed to copy all of the base genome resources used by the g
 
 ```
 nextflow run isl_refs_to_refgenie/main.nf \
-    --mode=<type of salmon index: [normal, splici]> \
+    --mode=<type of salmon index: [normal, splici, both]> \
     --irapConfigDir=<path to directory with species-wise configuration files as used by IRAP> \
     --irapDataDir=<path to top level IRAP data directory, with 'references' subdirectory> \
     --refgenieDir=<path to refgenie top directory> \
@@ -44,7 +44,7 @@ All genome resources are indexed by hisat2. Contamination indices are also index
 #### Transcriptome indices
 
 Each of the 4 transcriptome assets for each species (current and newest, with/without spikes) is indexed by both Kallisto and Salmon, with versions picked to match our single-cell pipelines.
-The Salmon indices can be eiher build with the cDNA ('normal') or an intron containing transcriptome can be indexed ('splici').
+The Salmon indices can be eiher build with the cDNA ('normal') or an intron containing transcriptome can be indexed ('splici'). When running with --mode both, both normal and splici salmon index are generated. 
 
 ## Result
 
