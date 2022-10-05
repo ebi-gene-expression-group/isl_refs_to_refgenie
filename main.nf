@@ -547,7 +547,7 @@ process build_salmon_index {
         tuple val(species), val(assembly), val(version) into SALMON_DONE
         
     script:
-    if( mode == 'normal' || mode == 'both' )
+    if( mode == 'normal' )
         """
         salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
         cdna_asset="fasta=${species}--${assembly}/fasta_txome:cdna_${version}"
@@ -566,7 +566,7 @@ process build_salmon_index {
          -b true \
          -s \$cdna_asset
         """
-    if( mode == 'splici' || mode == 'both' )
+    else if( mode == 'splici' )
         """
         salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
         splici_asset="fasta=${species}--${assembly}/fasta_txome:splici_${version}"
@@ -585,7 +585,43 @@ process build_salmon_index {
         -b true \
         -s \$splici_asset
         """
-     else
+     else if( mode == 'both' )
+        """
+        #build both the normal and the splici index
+        salmon_version=\$(cat ${baseDir}/envs/refgenie.yml | grep salmon | awk -F'=' '{print \$2}')
+        cdna_asset="fasta=${species}--${assembly}/fasta_txome:cdna_${version}"
+   
+        tags=\$(for at in \$(echo ${version} ${additionalTags} | tr "," "\\n"); do
+                echo "\${at}--salmon_v\${salmon_version}"
+        done | tr '\\n' ',' | sed 's/,\$//')  
+        build_asset.sh \
+         -a ${species}--${assembly} \
+         -r salmon_index \
+         -d ${params.refgenieDir} \
+         -t \$tags \
+         -x 'cdna_' \
+         -m yes \
+         -b true \
+         -s \$cdna_asset
+
+
+        splici_asset="fasta=${species}--${assembly}/fasta_txome:splici_${version}"
+        
+        
+        tags=\$(for at in \$(echo ${version} ${additionalTags} | tr "," "\\n"); do
+                 echo "\${at}--salmon_v\${salmon_version}"
+        done | tr '\\n' ',' | sed 's/,\$//')  
+        build_asset.sh \
+        -a ${species}--${assembly} \
+        -r salmon_index \
+        -d ${params.refgenieDir} \
+        -t \$tags \
+        -x 'splici_' \
+        -m yes \
+        -b true \
+        -s \$splici_asset
+        """
+    else 
         """
         error "Invalid salmon mode: ${mode}"
         """
