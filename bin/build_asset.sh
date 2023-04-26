@@ -72,7 +72,7 @@ fi
 built=0
 firsttag=
 
-if [ -n "$refenieDir" ]; then
+if [ -n "$refgenieDir" ]; then
     export REFGENIE=${refgenieDir}/genome_config.yaml 
 elif [ -n "$REFGENIE" ]; then
     refgenieDir=$(dirname $REFGENIE)
