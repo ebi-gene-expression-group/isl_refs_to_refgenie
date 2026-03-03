@@ -22,7 +22,6 @@ VIRUSES = Channel.of(['viruses', "${params.contamination.viruses.assembly}", fil
 process find_current_reference_files {
 
     errorStrategy 'finish'
-    conda "${baseDir}/envs/refgenie.yml"
     
     input: 
         file(confFile) from IRAP_CONFIGS
@@ -70,7 +69,6 @@ CURRENT_REF_FILES
 process find_newest_reference_files {
 
     errorStrategy 'finish'
-    conda "${baseDir}/envs/refgenie.yml"
 
     input:
         tuple val(species), val(taxId), val(source), val(genomePattern), val(cdnaPattern), val(gtfPattern), val(assembly) from GENOMES.join(CURRENT_REF_FILES_FOR_NEWEST.map{r -> tuple(r[0])})
@@ -165,7 +163,10 @@ REF_FILES_NOT_SPIKES
 
 process make_contamination_fastas {
 
-    errorStrategy 'finish'
+    errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'finish' }
+
+    memory { 20.GB * task.attempt }
+
     input:
         tuple val(ecoliSpecies), val(ecoliAssembly), file("ecoli.fa.gz"), val(tag) from ECOLI
         tuple val(fungiSpecies), val(fungiAssembly), file("fungi.fa.gz"), val(tag) from FUNGI
@@ -210,7 +211,7 @@ REF_FILES_FOR_GENOME
 
 process build_genome {
     
-    memory { 2.GB * task.attempt }
+    memory { 20.GB * task.attempt }
 
     errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
     maxRetries 3
@@ -259,6 +260,7 @@ GENOME_REFERENCE_FOR_COLLECTION
 process reduce_genomes {
 
     conda "${baseDir}/envs/refgenie.yml"
+
     errorStrategy 'finish'
     
     memory { 20.GB * task.attempt }
@@ -291,6 +293,9 @@ GENOME_REFERENCE_FOR_POSTGENOME.map{r -> tuple(r[0] + r[1], r).flatten()}
 process build_cdna {
  
     errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+
+    memory { 20.GB * task.attempt }
+
     maxRetries 3
     
     conda "${baseDir}/envs/refgenie.yml"
@@ -361,6 +366,9 @@ process reduce_cdnas {
 process build_splici_txome {
  
     errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+
+    memory { 20.GB * task.attempt }
+
     maxRetries 3
     
     conda "${baseDir}/envs/refgenie.yml"
@@ -414,6 +422,7 @@ SPLICI_REFERENCE_FOR_COLLECTION
 process reduce_splici {
 
     conda "${baseDir}/envs/refgenie.yml"
+
     errorStrategy 'finish'
     
     memory { 20.GB * task.attempt }
@@ -434,6 +443,9 @@ process reduce_splici {
 process build_annotation {
     
     errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+
+    memory { 20.GB * task.attempt }
+
     maxRetries 3
     
     conda "${baseDir}/envs/refgenie.yml"
@@ -634,6 +646,7 @@ process build_kallisto_index {
     memory { 20.GB * task.attempt }
 
     errorStrategy { sleep(Math.pow(2, task.attempt) * 200 as long); return  task.exitStatus == 130 || task.exitStatus == 137 || task.attempt < 3  ? 'retry': 'ignore' }
+
     maxRetries 3
 
     input:
@@ -702,6 +715,8 @@ process reduce {
 
 process get_alias_table {
 
+    memory { 20.GB * task.attempt }
+
     conda "${baseDir}/envs/refgenie.yml"
     
     input:
@@ -723,6 +738,9 @@ process get_alias_table {
 process alias_genomes {
 
     conda "${baseDir}/envs/refgenie.yml"
+
+    memory { 20.GB * task.attempt }
+
     errorStrategy 'ignore'
     
     maxForks 1
